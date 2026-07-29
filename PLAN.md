@@ -19,32 +19,65 @@ The radar is organised into **four functional blocks**: a PLL-based chirp source
 
 ```mermaid
 flowchart LR
-    subgraph CHIRP["Chirp Source"]
-        TCXO[TCXO] --> PLL[PLL] --> LF[Loop<br/>Filter] --> VCO[VCO]
-    end
+    %% Chirp Source
+    REF((("TCXO<br/>100 MHz")))
+    PLL(["ADF41510<br/>PLL"])
+    LF{"Loop<br/>Filter"}
+    VCO(("VCO<br/>5.5–6 GHz"))
 
-    subgraph TX["TX Chain"]
-        VCO --> PAD[Pad] --> PA[PA] --> DIV[Divider]
-        DIV --> TXA[TX Antenna]
-    end
+    %% TX Chain
+    PAD[/"6 dB<br/>Pad"\]
+    PA>"YG802020W<br/>PA"]
+    DIV(("GP2X+<br/>Divider"))
+    TXANT[/"TX Ant<br/>24 dBi"\]
 
-    subgraph RX["RX Chain"]
-        RXA2[RX Antenna] --> LNA2[LNA] --> MIX[Mixer]
-        DIV -. LO .-> MIX
-        MIX --> IFA[IF Amp] --> AGC2[AGC]
-    end
+    %% RX Chain
+    RXANT[/"RX Ant<br/>24 dBi"\]
+    LNA>"QPL9547<br/>LNA"]
+    MIX(("YX18<br/>Mixer"))
+    IFA>"OPA838<br/>×10"]
+    AGC>"MCP6S91<br/>AGC"]
 
-    subgraph DSP["Digital Processing"]
-        AGC2 --> ADC2[ADC] --> FPGA2[FPGA] --> PC2[PC]
-        MCU2[MCU] -. SPI .-> PLL
-        MCU2 -. SPI .-> AGC2
-    end
+    %% Digital
+    ADC[/"AD9643<br/>250 MSPS"\]
+    FPGA["XC7A100T<br/>FPGA"]
+    MCU["STM32H503<br/>MCU"]
+    PC(["PC"])
 
-    style CHIRP fill:#fafbfc,stroke:#d0d7de
-    style TX fill:#fafbfc,stroke:#d0d7de
-    style RX fill:#fafbfc,stroke:#d0d7de
-    style DSP fill:#fafbfc,stroke:#d0d7de
+    %% Chirp Source flow
+    REF --> PLL --> LF --> VCO
+
+    %% TX flow
+    VCO --> PAD --> PA --> DIV
+    DIV --> TXANT
+    DIV -. LO .-> MIX
+
+    %% RX flow
+    RXANT --> LNA --> MIX
+    MIX --> IFA --> AGC --> ADC --> FPGA --> PC
+
+    %% MCU control
+    MCU -. SPI .-> PLL
+    MCU -. SPI .-> AGC
+
+    %% Subtle styling
+    classDef chirp fill:#fafbfc,stroke:#d0d7de,color:#24292f
+    classDef rf fill:#fafbfc,stroke:#d0d7de,color:#24292f
+    classDef digital fill:#fafbfc,stroke:#d0d7de,color:#24292f
+
+    class REF,PLL,LF,VCO,PAD,PA,DIV,TXANT,RXANT,LNA,MIX,IFA,AGC,ADC,FPGA,MCU,PC chirp
 ```
+
+**Shape legend** (standard RF block diagram conventions):
+
+| Shape | Used for | Examples |
+|-------|----------|----------|
+| Trapezoid | Antenna, filter, pad | TX Ant, RX Ant, 6 dB pad |
+| Flag/triangle | Amplifier | YG802020W PA, QPL9547 LNA, OPA838, MCP6S91 |
+| Circle | Mixer, divider, VCO, reference | YX18 mixer, GP2X+ divider, VCO, TCXO |
+| Stadium | PLL, FPGA, MCU, PC | ADF41510, XC7A100T, STM32H503, PC display |
+| Diamond | Filter | Loop filter |
+| Parallelogram | ADC | AD9643 |
 
 ### Block summary
 
@@ -105,7 +138,63 @@ flowchart LR
 
 ## Signal Chain
 
+The signal chain is shown in three views: **TX path** (chirp → antenna), **RX path** (antenna → digital), and **Complete path** (TX + RX with the mixer connection between them).
+
 ### TX Path
+
+```mermaid
+flowchart LR
+    VCO(("VCO<br/>+6 dBm")) --> PAD[/"6 dB<br/>Pad"\] --> PA>"YG802020W<br/>+15 dB"] --> DIV(("GP2X+<br/>Divider"))
+    DIV -->|+11.4 dBm| TXANT[/"TX Antenna<br/>+35.4 dBm EIRP"\]
+    DIV -.->|LO +11.4 dBm| LO(("To mixer"))
+```
+
+Power levels: VCO +6 dBm → pad 0 dBm → PA +15 dBm → divider +11.4 dBm per port.
+
+### RX Path
+
+```mermaid
+flowchart LR
+    RXANT[/"RX Antenna<br/>-107 to -159 dBm"/] --> LNA>"QPL9547<br/>+10 dB"] --> MIX(("YX18<br/>Mixer"))
+    MIX --> IFA>"OPA838<br/>×10"] --> AGC>"MCP6S91<br/>AGC 0-30 dB"] --> ADC[/"AD9643<br/>250 MSPS"\] --> FPGA["XC7A100T<br/>FPGA"] --> PC(["PC"])
+
+    LO_in(("LO")) -.-> MIX
+```
+
+Signal path: antenna → LNA → mixer (with LO) → IF amp → AGC → ADC → FPGA → PC.
+
+### Complete Path (TX + RX)
+
+```mermaid
+flowchart TB
+    subgraph CHIRP["Chirp Source"]
+        VCO(("VCO"))
+    end
+
+    subgraph TX["TX Chain"]
+        VCO --> PAD[/"6 dB<br/>Pad"\] --> PA>"PA"] --> DIV(("Divider"))
+        DIV --> TXANT[/"TX Ant"\]
+    end
+
+    subgraph RX["RX Chain"]
+        RXANT[/"RX Ant"\] --> LNA>"LNA"] --> MIX(("Mixer"))
+        DIV -. LO .-> MIX
+        MIX --> IFA>"IF Amp"] --> AGC>"AGC"] --> ADC[/"ADC"\] --> FPGA["FPGA"] --> PC(["PC"])
+        MCU["MCU"] -. SPI .-> AGC
+    end
+
+    TXANT -. radiates .-> TARGET(["Drone"])
+    TARGET -. echoes .-> RXANT
+
+    style CHIRP fill:#fafbfc,stroke:#d0d7de
+    style TX fill:#fafbfc,stroke:#d0d7de
+    style RX fill:#fafbfc,stroke:#d0d7de
+    style TARGET fill:#fff8c5,stroke:#d4a72c,color:#24292f
+```
+
+The **target (drone)** is shown explicitly in the complete path, with the dotted arrows indicating RF radiation and echo reception. This is the full picture: VCO → TX antenna → air → target → RX antenna → IF chain → ADC → FPGA.
+
+### Reference: Detailed power levels
 
 ```
 YSGM556006 VCO (PLL-locked, +6 dBm)
@@ -120,8 +209,6 @@ YSGM556006 VCO (PLL-locked, +6 dBm)
     │
     └── Port 2 → NCS4-63+ balun → YX18 mixer LO port
 ```
-
-### RX Path
 
 ```
 RX antenna (24 dBi) — target echoes: −107 to −159 dBm
