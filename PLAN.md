@@ -2,7 +2,7 @@
 
 ## Goal
 
-Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. PLL-based chirp source (ADF41510 + YSGM556006 VCO), diode-ring mixer RX, dual 14-bit 250 MSPS ADC (AD9643), Xilinx Artix-7 XC7A100T FPGA for DSP, STM32C031 housekeeping MCU.
+Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. PLL-based chirp source (ADF41510 + YSGM556006 VCO), diode-ring mixer RX, dual 14-bit 250 MSPS ADC (AD9643), Xilinx Artix-7 XC7A100T FPGA for DSP, STM32H503 housekeeping MCU.
 
 **Realistic prototype 1 targets:**
 - ~2 km for small drones (σ = 0.01 m²) — with 64-chirp coherent integration
@@ -11,19 +11,59 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 - Scan rate 100 Hz to 10 kHz (configurable)
 - Micro-Doppler drone/bird discrimination
 
-**Key advantage of PLL + FPGA:**
-- **Phase noise**: −231 dBc/Hz (ADF41510 fractional-N) vs ~−80 dBc/Hz (free VCO) → much better sensitivity for small targets
-- **Coherent integration**: PLL locks to TCXO → true +18 dB gain for 64 chirps (not just +9 dB noncoherent)
-- **Micro-Doppler**: FPGA processes high-PRF chirps in real-time → 100–500 Hz rotor modulation visible
+---
 
-### Drone RCS Reference
+## System Architecture
 
-| Drone class | Example | RCS (σ) | dBsm |
-|-------------|---------|---------|------|
-| Micro (< 250 g) | DJI Mini 4 | 0.001–0.005 m² | −30 to −23 dBsm |
-| Small (250 g – 2 kg) | DJI Phantom 4 | 0.01–0.05 m² | −20 to −13 dBsm |
-| Medium (2–25 kg) | DJI Matrice 300 | 0.05–0.1 m² | −13 to −10 dBsm |
-| Large (> 25 kg) | Fixed-wing UAV | 0.1–1 m² | −10 to 0 dBsm |
+```mermaid
+graph TB
+    subgraph CHIRP["Chirp Source (PLL)"]
+        TCXO["TCXO 100 MHz"]
+        PLL["ADF41510<br/>Fractional-N PLL"]
+        LPF["Loop Filter<br/>100 kHz BW"]
+        VCO["YSGM556006<br/>VCO in PLL loop"]
+        TCXO --> PLL --> LPF --> VCO
+    end
+
+    subgraph TX["TX Chain"]
+        PAD["6 dB π-pad<br/>150/37.4/150"]
+        PA["YG802020W<br/>+15 dB"]
+        DIV["GP2X+<br/>2-way divider"]
+        TXANT["TX Antenna 24 dBi"]
+        VCO --> PAD --> PA --> DIV
+        DIV -->|+11.4 dBm| TXANT
+    end
+
+    subgraph RX["RX Chain"]
+        RXANT["RX Antenna 24 dBi"]
+        LNA["QPL9547<br/>LNA ~1 dB NF"]
+        BALUN["NCS4-63+<br/>Balun 1:4"]
+        MIXER["YX18<br/>Diode mixer"]
+        LPF2["RC LPF 4.8 MHz"]
+        IFAMP["OPA838 ×10"]
+        AGC["MCP6S91<br/>AGC 0-30 dB"]
+        RXANT --> LNA --> BALUN --> MIXER
+        DIV -->|LO +11.4 dBm| MIXER
+        MIXER --> LPF2 --> IFAMP --> AGC
+    end
+
+    subgraph DSP["Digital Processing"]
+        ADC["AD9643<br/>14-bit, 250 MSPS"]
+        FPGA["Xilinx XC7A100T<br/>Artix-7 FPGA"]
+        MCU["STM32H503<br/>Housekeeping MCU"]
+        PC["PC<br/>Range-Doppler display"]
+        AGC --> ADC --> FPGA
+        FPGA -->|UART/USB| PC
+        MCU -.->|SPI config| PLL
+        MCU -.->|SPI AGC| AGC
+        MCU -.->|I²C temp| TMP102["TMP102"]
+    end
+
+    style CHIRP fill:#e1f5ff
+    style TX fill:#fff3e0
+    style RX fill:#f3e5f5
+    style DSP fill:#e8f5e9
+```
 
 ---
 
@@ -35,7 +75,7 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 | 2 | **ADF41510** (ADI) | Fractional-N PLL | 1 | 1–10 GHz, −231 dBc/Hz PN, 250 MHz PFD, built-in ramp gen |
 | 3 | **TCXO 100 MHz** (e.g., ECS-TXO-5032-100MHz) | PLL reference | 1 | 100 MHz, ±1 ppm, low phase noise |
 | 4 | **Loop filter components** | Active op-amp + RC | 1 set | 100 kHz BW, 50° phase margin |
-| 5 | **TMP102AIDRLR** (TI) | Temperature sensor (optional) | 1 | I²C, ±0.5 °C, SOT-563 — for monitoring only |
+| 5 | **TMP102AIDRLR** (TI) | Temperature sensor (optional) | 1 | I²C, ±0.5 °C, SOT-563 |
 | 6 | **YG802020W** (Innotion) | TX driver | 1 | +15 dB gain, P1dB ~+16 dBm @ 5.5 GHz |
 | 7 | **GP2X+** (Mini-Circuits) | 2-way power divider | 1 | 2.9–6.2 GHz, 3.6 dB total loss |
 | 8 | **QPL9547TR7** (Qorvo) | RX LNA | 1 | ~1 dB NF, ~10 dB gain at 5.75 GHz (verify) |
@@ -46,9 +86,9 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 | 13 | **AD9643BCPZ-250** (ADI) | ADC | 1 | Dual 14-bit, 250 MSPS, LVDS, QFN-48 |
 | 14 | **XC7A100T-CSG324** (Xilinx) | FPGA | 1 | Artix-7, 101K logic cells, 240 DSP slices |
 | 15 | **MT41K256M16TW-107** (Micron) | DDR3L SDRAM | 1 | 256M × 16 = 512 MB |
-| 16 | **STM32C031C6T6** (ST) | Housekeeping MCU | 1 | Cortex-M0+ @ 48 MHz, 32 KB flash |
+| 16 | **STM32H503** (ST) | Housekeeping MCU | 1 | Cortex-M33 @ 250 MHz, 128 KB SRAM, USB |
 | 17 | **ADP150AUJZ-5.0** (ADI) | Ultra-low noise LDO | 1 | 5 V for VCO |
-| 18 | **LTM4644** (ADI) | FPGA power module | 1 | Multi-rail DC/DC (1.0V, 1.8V, 3.3V) |
+| 18 | **LTM4644** (ADI) | FPGA power module | 1 | Multi-rail DC/DC (1.0/1.8/3.3 V) |
 | 19 | **LD1117S33** | 3.3 V LDO | 1 | MCU, ADC digital |
 | 20 | Resistors: 150 Ω, **37.4 Ω**, 150 Ω | 6 dB π-pad (corrected) | 3 | 0603 thin-film |
 | 21 | Resistors: 1 kΩ, 9.09 kΩ | OPA838 gain (×10) | 2 | 0603, E96 |
@@ -114,7 +154,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
                           │   (fractional-N PLL)    │
   TCXO 100 MHz ──────────►│  REF_IN                  │
                           │                         │
-  STM32C031 SPI ────────►│  LE, CLK, DATA          │
+  STM32H503 SPI ────────►│  LE, CLK, DATA          │
   (ramp parameters)       │  (ramp start, stop,     │
                           │   step, time, mode)     │
                           │                         │
@@ -139,9 +179,9 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
 | Function | Component | Notes |
 |----------|-----------|-------|
 | Chirp generation | **ADF41510** built-in ramp gen | Sawtooth or triangular, configurable |
-| ADF41510 config | **STM32C031** SPI | Ramp parameters, mode selection |
-| AGC control (MCP6S91) | **STM32C031** SPI | One SPI write per chirp |
-| Temperature monitoring | **STM32C031** I2C → TMP102 | Optional (PLL eliminates drift) |
+| ADF41510 config | **STM32H503** SPI | Ramp parameters, mode selection |
+| AGC control (MCP6S91) | **STM32H503** SPI | One SPI write per chirp |
+| Temperature monitoring | **STM32H503** I2C → TMP102 | Optional (PLL eliminates drift) |
 | ADC interface | **XC7A100T** ISERDES (LVDS) | 14-bit @ 250 MSPS, DDR |
 | DDC + decimation | **XC7A100T** CORDIC + CIC + FIR | 250 MSPS → 3.9 MSPS |
 | Range FFT | **XC7A100T** Xilinx FFT IP | 1024-pt, < 1 µs latency |
@@ -149,7 +189,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
 | MTI, CFAR, detection | **XC7A100T** | Hardware, deterministic |
 | Micro-Doppler | **XC7A100T** | High-PRF mode (10 kHz) |
 | Tracking, output | **XC7A100T** | Kalman filter, USB/UART |
-| Debug / config | **STM32C031** UART | Mode switching, ADF41510 reconfig |
+| Debug / config | **STM32H503** UART | Mode switching, ADF41510 reconfig |
 
 ---
 
@@ -261,7 +301,7 @@ The ADF41510's ramp generator produces:
 - **Sawtooth**: f_start → f_stop over T_ramp, then snap back to f_start
 - **Triangular**: f_start → f_stop → f_start, each over T_ramp/2
 
-STM32C031 configures the ramp via SPI:
+STM32H503 configures the ramp via SPI:
 - Start frequency (e.g., 5.5 GHz)
 - Stop frequency (e.g., 6.0 GHz)
 - Step size (e.g., 100 kHz for 5000 steps over 500 MHz)
@@ -325,7 +365,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 2. **YSGM556006 as PLL VCO** — reused from existing stock. Becomes the VCO in the PLL loop.
 3. **XC7A100T FPGA** — all real-time DSP. Replaces the MCU approach. Enables coherent integration (+18 dB), micro-Doppler, 2D range-Doppler.
 4. **AD9643 at 250 MSPS** — dual 14-bit LVDS. Ch A for IF, Ch B for future I/Q.
-5. **STM32C031 housekeeping MCU** — ADF41510 config, MCP6S91 AGC, TMP102 temp monitoring, USB.
+5. **STM32H503 housekeeping MCU** — ADF41510 config, MCP6S91 AGC, TMP102 temp monitoring, USB. Modern Cortex-M33 at 250 MHz.
 6. **TCXO 100 MHz reference** — PLL reference. Low phase noise, ±1 ppm.
 7. **Open-loop DAC ramp removed** — PLL generates the ramp. No more LUT pre-distortion, no more temperature compensation needed.
 8. **Single YG802020W before GP2X+ divider** — P1dB ~+16 dBm at 5.5 GHz, output +15 dBm.
@@ -345,16 +385,16 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 
 ### Phase 0: Documentation
 
-- [x] Update Lyrion-Radar README.md with ADF41510 PLL architecture
-- [x] Update PLAN.md with same architecture
+- [x] Update Lyrion-Radar README.md with Mermaid diagram, STM32H503, professional layout
+- [x] Update PLAN.md with same changes
 
 ### Phase 1: Hardware Bring-Up
 
 - [ ] Acquire XC7A100T dev board (Digilent Arty A7-100T) or design custom PCB
 - [ ] Acquire AD9643BCPZ-250 (or use evaluation board)
 - [ ] Acquire ADF41510 (or use EVAL-ADF41510)
-- [ ] Acquire 100 MHz TCXO (ECS-TXO-5032-100MHz or similar)
-- [ ] Acquire STM32C031 dev board
+- [ ] Acquire 100 MHz TCXO
+- [ ] Acquire STM32H503 dev board
 - [ ] Acquire DDR3L SDRAM
 - [ ] LTM4644 power module for FPGA rails
 - [ ] Verify all other parts from BOM are in hand
@@ -365,7 +405,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - [ ] Solder ADF41510, loop filter, YSGM556006 VCO
 - [ ] Power up, verify PLL locks at 5.75 GHz
 - [ ] Configure ramp via SPI: 5.5 → 6.0 GHz, 1 ms sawtooth
-- [ ] Measure ramp linearity on spectrum analyzer (should be very linear)
+- [ ] Measure ramp linearity on spectrum analyzer
 - [ ] Measure phase noise at 100 kHz offset (target: ~−200 dBc/Hz or better)
 - [ ] Test all modes: Search (10 ms), Track (5 ms), Fast (1 ms), Micro-Doppler (0.1 ms)
 - [ ] Measure TX output: +6 dBm at VCO, +15 dBm after YG802020W
@@ -385,7 +425,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - [ ] Build YX18 mixer with 2× NCS4-63+ baluns
 - [ ] Solder RC LPF (1 kΩ + 33 pF, fc ≈ 4.8 MHz)
 - [ ] Solder OPA838 (G=×10)
-- [ ] Solder MCP6S91 (SPI from STM32C031)
+- [ ] Solder MCP6S91 (SPI from STM32H503)
 - [ ] Verify mixer conversion loss with two signal generators
 
 ### Phase 5: FPGA Firmware (VHDL/Verilog in Vivado)
@@ -407,9 +447,9 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - [ ] Tracking: Kalman filter across frames
 - [ ] UART output: detected targets with range, velocity, amplitude
 
-### Phase 6: MCU Firmware (STM32C031)
+### Phase 6: MCU Firmware (STM32H503)
 
-- [ ] CubeMX project for STM32C031C6T6
+- [ ] CubeMX project for STM32H503
 - [ ] SPI1 → ADF41510 (ramp configuration, RAMP_START trigger)
 - [ ] SPI2 → MCP6S91 (AGC gain control)
 - [ ] I2C1 → TMP102 (temperature monitoring)
@@ -438,7 +478,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - **Loop filter**: close to ADF41510 charge pump output, short traces
 - **YSGM556006 VCO**: close to loop filter output, short VT trace (parasitic capacitance degrades loop phase margin)
 - **TCXO reference**: clean supply, short trace to ADF41510 REF_IN
-- **SPI**: short traces to STM32C031, with proper grounding
+- **SPI**: short traces to STM32H503, with proper grounding
 
 ### ADC (AD9643) to FPGA Interface
 

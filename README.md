@@ -1,573 +1,352 @@
-# Lyrion Radar 🛰️
+<p align="center">
+  <h1 align="center">Lyrion Radar</h1>
+  <p align="center">
+    <strong>FMCW Radar for Counter-UAS (Drone Detection)</strong><br>
+    5.5–6 GHz · 30 cm range resolution · 2–3 km detection range
+  </p>
+</p>
 
-**FMCW radar at 5.5–6 GHz for counter-UAS (drone detection) — PLL-based chirp + FPGA-based DSP.**
-
-[![Status](https://img.shields.io/badge/Status-Planning-yellow)]()
-[![License](https://img.shields.io/badge/License-TBD-lightgrey)]()
+<p align="center">
+  <a href="#what-is-it"><img alt="Status" src="https://img.shields.io/badge/Status-Planning-yellow"></a>
+  <a href="#components"><img alt="Components" src="https://img.shields.io/badge/Components-10+-blue"></a>
+  <a href="#link-budget"><img alt="Range" src="https://img.shields.io/badge/Range-2%E2%80%933%20km-success"></a>
+  <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-TBD-lightgrey"></a>
+</p>
 
 ---
 
 ## Table of Contents
 
-- [What is Lyrion Radar?](#what-is-lyrion-radar)
+- [What is it?](#what-is-it)
+- [Key Features](#key-features)
+- [System Overview](#system-overview)
+- [How it Works](#how-it-works)
+- [Components](#components)
+- [Signal Chain](#signal-chain)
+- [Link Budget](#link-budget)
+- [Chirp Modes](#chirp-modes)
 - [Why PLL + FPGA?](#why-pll--fpga)
-- [Honest Assessment](#honest-assessment)
-- [FMCW Principle in 30 Seconds](#fmcw-principle-in-30-seconds)
-- [Drone Detection — Realistic Targets](#drone-detection--realistic-targets)
-- [System Architecture](#system-architecture)
-- [FPGA DSP Pipeline](#fpga-dsp-pipeline)
-- [Complete Component List](#complete-component-list)
-- [Signal Chain Walkthrough](#signal-chain-walkthrough)
-- [Power Budgets & Link Budget](#power-budgets--link-budget)
-- [Chirp Configurations](#chirp-configurations)
-- [Design Decisions Explained](#design-decisions-explained)
-- [Known Issues & Open Questions](#known-issues--open-questions)
-- [Project Status](#project-status)
+- [Design Decisions](#design-decisions)
+- [Status & Roadmap](#status--roadmap)
+- [Known Limitations](#known-limitations)
+- [License](#license)
 
 ---
 
-## What is Lyrion Radar?
+## What is it?
 
-Lyrion Radar is a **Frequency-Modulated Continuous-Wave (FMCW) radar** operating in the 5.5–6.0 GHz band, designed primarily for **drone detection (counter-UAS)** with secondary capability for general ranging.
+Lyrion Radar is a **Frequency-Modulated Continuous-Wave (FMCW) radar** designed to detect small drones (DJI Phantom class and larger) at ranges of 2–3 km. It uses a **fractional-N PLL for chirp generation**, a **Xilinx Artix-7 FPGA for real-time signal processing**, and a **14-bit 250 MSPS ADC** for IF digitization.
 
-The signal chain uses an **ADF41510 fractional-N PLL** with built-in ramp generator (the YSGM556006 is the VCO in the PLL loop), a **diode-ring mixer** for downconversion, a **dual 14-bit 250 MSPS ADC** for IF digitization, and a **Xilinx Artix-7 XC7A100T FPGA** for all real-time signal processing. A small **STM32C031 MCU** handles housekeeping (PLL config, AGC, temperature, USB).
+The design is built around a **phase-locked loop** (not an open-loop DAC) for chirp coherence, and an **FPGA** (not a microcontroller) for the real-time DSP pipeline. This enables:
 
-### Quick Facts
-
-| Parameter | Value |
-|-----------|-------|
-| Frequency band | 5.5–6.0 GHz (500 MHz sweep) |
-| Range resolution | **30 cm** |
-| Realistic max range (small drone) | **~2 km** (coherent integration, no PA) |
-| Realistic max range (medium drone) | **~3 km** (coherent integration, no PA) |
-| Path to 5+ km | PA upgrade (MMG3H21NT1) |
-| TX power | +11.4 dBm (prototype 1) |
-| Antenna gain | 24 dBi each (TX and RX, separate) |
-| Chirp source | **ADF41510 PLL** (built-in ramp gen) |
-| ADC | **AD9643 dual 14-bit, 250 MSPS** (LVDS to FPGA) |
-| DSP | **Xilinx XC7A100T** Artix-7 (101K logic cells, 240 DSP slices) |
-| Control MCU | STM32C031 (PLL config, AGC, temp, USB) |
-| Scan rate | 100 Hz to 10 kHz (configurable) |
-| Estimated BOM cost | ~$250 (Arty A7-100T + parts) |
+- **True coherent integration** across 64+ chirps (+18 dB SNR)
+- **Micro-Doppler analysis** (drone rotor blade modulation at 100–500 Hz)
+- **2D range-Doppler maps** in real-time
+- **Deterministic latency** for tracking
 
 ---
 
-## Why PLL + FPGA?
+## Key Features
 
-For serious drone detection, you need three things: **phase coherence**, **micro-Doppler processing**, and **low phase noise**. Only a PLL + FPGA architecture delivers all three.
-
-| Requirement | Open-loop DAC + MCU | **ADF41510 PLL + FPGA** |
-|-------------|--------------------|-----------------------|
-| Phase noise @ 100 kHz | ~−80 dBc/Hz (free VCO) | **−231 dBc/Hz** (fractional-N) |
-| Chirp-to-chirp coherence | Unproven (likely noncoherent) | **Proven** (PLL locks to TCXO) |
-| Coherent integration gain | +9 dB (noncoherent) | **+18 dB** (coherent) |
-| Frequency linearity | Needs LUT pre-distortion | **Built-in ramp generator** |
-| Temperature stability | Needs TMP102 + compensation | **Eliminated** (PLL locks) |
-| Micro-Doppler (100–500 Hz) | Infeasible (PRF too low) | **Trivial** (10 kHz PRF mode) |
-| 2D range-Doppler | Slow (software) | **< 100 µs** (hardware FFT) |
-| I/Q channels | Future (ch B) | **Available now** (ch B) |
-| Range impact (small drone) | 1 km | **2–3 km** (without PA) |
-
-The ADF41510's built-in ramp generator is specifically designed for FMCW radar — it produces highly linear sawtooth or triangular chirps with configurable rate, step size, and dwell. The YSGM556006 (which you have 10 of) becomes the VCO in the PLL loop, so you're not wasting any parts.
-
----
-
-## Honest Assessment
-
-| Claimed | Status |
-|---------|--------|
-| +18 dB coherent integration gain (64 chirps) | **Achievable.** PLL + FPGA phase tracking enables this. |
-| Phase noise −231 dBc/Hz | **Datasheet spec.** Real-world will be slightly worse (PLL loop filter, reference noise) but still > 50 dB better than free-running VCO. |
-| Micro-Doppler drone/bird discrimination | **Feasible.** 0.1 ms ramps at 10 kHz PRF in FPGA. |
-| 2–3 km small drone detection | **Plausible.** With coherent integration (+18 dB) and 24 dBi antennas, the link budget supports this. |
-| +35 dBm EIRP at 5.5–6 GHz is legal/ISM | **Wrong.** UNII/DFS bands. Needs licensed or experimental authorization. |
+| Feature | Specification |
+|---------|---------------|
+| **Frequency band** | 5.5 – 6.0 GHz (500 MHz sweep) |
+| **Range resolution** | 30 cm |
+| **Max range (small drone, σ=0.01 m²)** | ~2 km |
+| **Max range (medium drone, σ=0.1 m²)** | ~3 km |
+| **Chirp source** | ADF41510 fractional-N PLL (built-in ramp gen) |
+| **Phase noise** | −231 dBc/Hz @ 100 kHz (fractional-N) |
+| **ADC** | AD9643 dual 14-bit, 250 MSPS (LVDS) |
+| **DSP** | Xilinx XC7A100T Artix-7 FPGA |
+| **TX power** | +11.4 dBm (prototype 1) |
+| **Antenna gain** | 24 dBi each (TX and RX, separate) |
+| **EIRP** | +35.4 dBm (3.5 W ERP) |
+| **Scan rate** | 100 Hz – 10 kHz (configurable) |
+| **BOM cost** | ~$250 (with Arty A7-100T dev board) |
 
 ---
 
-## FMCW Principle in 30 Seconds
+## System Overview
 
-FMCW radar transmits a signal whose frequency sweeps linearly over time (a "chirp"). The signal reflects off a target and returns after a time delay `τ = 2R/c`. Mixing the received (delayed) signal with the current transmit signal produces a **beat frequency** directly proportional to target range:
+The radar is split into three functional blocks: **chirp source** (PLL), **analog front-end** (TX/RX), and **digital processing** (ADC + FPGA + MCU).
+
+```mermaid
+graph TB
+    subgraph CHIRP["Chirp Source (PLL)"]
+        TCXO["TCXO<br/>100 MHz"]
+        PLL["ADF41510<br/>Fractional-N PLL<br/>Built-in ramp gen"]
+        LPF["Loop Filter<br/>Active op-amp<br/>100 kHz BW"]
+        VCO["YSGM556006<br/>VCO in PLL loop<br/>5.5–6 GHz, +6 dBm"]
+        TCXO --> PLL
+        PLL --> LPF --> VCO
+    end
+
+    subgraph TX["TX Chain"]
+        PAD["6 dB π-pad"]
+        PA["YG802020W<br/>TX driver<br/>+15 dB gain"]
+        DIV["GP2X+<br/>2-way divider<br/>-3.6 dB"]
+        TXANT["TX Antenna<br/>24 dBi"]
+        VCO --> PAD --> PA --> DIV
+        DIV -->|"+11.4 dBm"| TXANT
+    end
+
+    subgraph RX["RX Chain"]
+        RXANT["RX Antenna<br/>24 dBi"]
+        LNA["QPL9547<br/>LNA<br/>~1 dB NF"]
+        BALUN1["NCS4-63+<br/>Balun 1:4"]
+        MIXER["YX18<br/>Diode mixer<br/>-7 dB conv loss"]
+        LPF2["RC LPF<br/>4.8 MHz"]
+        IFAMP["OPA838<br/>IF preamp ×10"]
+        AGC["MCP6S91<br/>PGA 1–32×"]
+        RXANT --> LNA --> BALUN1 --> MIXER
+        DIV -->|"LO +11.4 dBm"| MIXER
+        MIXER --> LPF2 --> IFAMP --> AGC
+    end
+
+    subgraph DSP["Digital Processing"]
+        ADC["AD9643<br/>14-bit, 250 MSPS<br/>LVDS"]
+        FPGA["Xilinx XC7A100T<br/>Artix-7 FPGA<br/>DDC → FFT → CFAR"]
+        MCU["STM32H503<br/>Housekeeping MCU<br/>PLL/AGC/Temp config"]
+        PC["PC<br/>Range-Doppler display"]
+        AGC --> ADC --> FPGA
+        FPGA -->|"UART/USB"| PC
+        MCU -.->|"SPI config"| PLL
+        MCU -.->|"SPI AGC"| AGC
+        MCU -.->|"I²C temp"| TMP102["TMP102"]
+    end
+
+    style CHIRP fill:#e1f5ff
+    style TX fill:#fff3e0
+    style RX fill:#f3e5f5
+    style DSP fill:#e8f5e9
+```
+
+---
+
+## How it Works
+
+### FMCW Principle
+
+The radar transmits a signal whose **frequency sweeps linearly over time** (a "chirp"). The signal reflects off a target and returns after a time delay `τ = 2R/c`. Mixing the received signal with the current transmit signal produces a **beat frequency** directly proportional to target range:
 
 ```
 f_IF = (2 · B · R) / (c · T)
 ```
 
-| Symbol | Meaning | Typical value |
-|--------|---------|---------------|
-| B | Sweep bandwidth | 500 MHz |
-| R | Target range | 1–3000 m |
-| c | Speed of light | 3·10⁸ m/s |
-| T | Ramp time | 1–10 ms |
+Where:
+- **B** = sweep bandwidth (500 MHz)
+- **R** = target range
+- **c** = speed of light
+- **T** = ramp time (1–10 ms)
 
-An FFT of this beat signal reveals targets as distinct frequency peaks. With a **triangular ramp** (up-chirp + down-chirp), range and velocity can be extracted simultaneously.
+An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **triangular ramp** (up-chirp + down-chirp) extracts both range and velocity.
 
----
+### Signal Flow
 
-## Drone Detection — Realistic Targets
-
-| Drone class | Example | RCS (σ) | Range with prototype 1 |
-|-------------|---------|---------|------------------------|
-| Micro (< 250 g) | DJI Mini 4 | 0.001–0.005 m² (−30 to −23 dBsm) | **~500 m** (marginal) |
-| Small (250 g – 2 kg) | DJI Phantom 4 | 0.01–0.05 m² (−20 to −13 dBsm) | **~2 km** |
-| Medium (2–25 kg) | DJI Matrice 300 | 0.05–0.1 m² (−13 to −10 dBsm) | **~3 km** |
-| Large (> 25 kg) | Fixed-wing UAV | 0.1–1 m² (−10 to 0 dBsm) | > 3 km |
-
-These ranges assume:
-- 64-chirp coherent integration (PLL + FPGA enables this)
-- 24 dBi antennas
-- 5–10 ms ramp
-- Drone flying roughly head-on or head-away
-
-### Why 5.5–6 GHz?
-
-- Good balance between resolution (500 MHz → 30 cm) and atmospheric attenuation
-- Smaller antennas than S-band, less rain fade than X-band
-- Components are widely available and affordable
-- **Regulatory caveat**: UNII/DFS segments. +35 dBm EIRP requires licensed or experimental authorization in most jurisdictions.
+1. **PLL generates chirp** (5.5–6 GHz, linear ramp)
+2. **TX chain** amplifies and splits the signal to the TX antenna and the mixer LO
+3. **RX chain** amplifies echoes (LNA), downconverts (mixer), filters (LPF), and digitizes (ADC)
+4. **FPGA** processes the IF signal: DDC → decimate → FFT → 2D FFT → detection
+5. **MCU** handles housekeeping: PLL config, AGC, temperature, USB
+6. **PC** displays the range-Doppler map and detected targets
 
 ---
 
-## System Architecture
+## Components
 
-### High-Level Block Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        CHIRP SOURCE (PLL)                                │
-│                                                                          │
-│  TCXO (100 MHz) ──► ADF41510 ──► Loop Filter ──► YSGM556006 VCO       │
-│                     (fractional-N,  (active,         (VCO in PLL)        │
-│                      built-in ramp   100 kHz BW)                        │
-│                      generator)              │                           │
-│  STM32C031 ──SPI──► ADF41510 config          │                           │
-│  (RAMP_START, freq, step, time)              │                           │
-│  TMP102 (I²C) ──► temp monitoring             │                           │
-└─────────────────────────────────────────────────┼────────────────────────┘
-                                                 │
-                                            5.5–6 GHz OUT
-                                           +6 dBm (locked)
-                                                 │
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            TX CHAIN                                      │
-│                                                                          │
-│                                     ┌──► TX antenna (24 dBi)            │
-│  VCO ──► 6 dB pad ──► YG802020W ──┤   +11.4 dBm → +35.4 dBm EIRP       │
-│  +6 dBm   (resistive)  (+15 dB)    │    (3.5 W ERP)                     │
-│             0 dBm       +15 dBm    └──► LO to mixer                     │
-│                                       +11.4 dBm                         │
-└─────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            RX CHAIN                                      │
-│                                                                          │
-│  RX antenna ──► QPL9547 ──► NCS4-63+ ──► YX18 ──► RC LPF ──► OPA838   │
-│  (24 dBi)       (LNA)       (balun)     (mixer)  (4.8 MHz)   (×10)      │
-│                 NF~1dB              ─────┤                             │
-│                 G~10dB               LO from GP2X+                     │
-│                                                                          │
-│  OPA838 ──► MCP6S91 ──► AD9643 ch A ─────► XC7A100T FPGA               │
-│  (×10)      (PGA 1-32×)  (14-bit          (DDC → decimate → 2D FFT →   │
-│             SPI AGC       250 MSPS, LVDS)  MTI → CFAR → detection)      │
-│                                                                          │
-│  AD9643 ch B ◄──── future I/Q or 2nd RX antenna (channel ready)        │
-│                                                                          │
-│  XC7A100T ──► USB/UART ──► PC (range-Doppler, detected targets)         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### Chirp Source — ADF41510 PLL Detail
-
-```
-                          ┌─────────────────────────┐
-                          │      ADF41510            │
-                          │   (fractional-N PLL)    │
-  TCXO 100 MHz ──────────►│  REF_IN                  │
-                          │                         │
-  STM32C031 SPI ────────►│  LE, CLK, DATA          │
-  (ramp parameters)       │  (ramp start, stop,     │
-                          │   step, time, mode)     │
-                          │                         │
-                          │  Phase frequency        │
-                          │  detector (PFD) ────────┼──► Loop filter
-                          │                         │     (active op-amp)
-                          │  Charge pump (CP) ──────┘            │
-                          │                                     ▼
-                          │                            YSGM556006 VCO
-                          │                            (tuning pin VT)
-                          │                                    │
-                          │  RF input ◄────────────────────────┘
-                          │  (prescaler ÷M, 1-10 GHz)
-                          └─────────────────────────┘
-                                      │
-                                      ▼
-                              5.5–6 GHz OUT
-                          (phase-locked, low noise)
-```
-
-The ADF41510's built-in ramp generator produces the chirp directly. The YSGM556006 (which you have 10 of) is the VCO in the PLL loop. The STM32C031 configures the ramp parameters via SPI.
-
-### FPGA and MCU Division of Labor
-
-```
-                    ┌────────────────────────────────────┐
-                    │  Xilinx XC7A100T (XC7A100TCSG324)  │
-                    │                                    │
-  AD9643 ch A (LVDS)─►│ ISERDES (8:1 DDR deserialization) │
-                    │                                    │
-  AD9643 ch B (LVDS)─►│ ISERDES (future I/Q or 2nd ant)   │
-                    │                                    │
-                    │  DDC (CORDIC / mixer)               │
-                    │  Decimation CIC/FIR                 │
-                    │  Window function (Hann/Blackman)   │
-                    │  FFT (Xilinx FFT IP, 1024-4096 pt) │
-                    │  2D FFT (range-Doppler)            │
-                    │  MTI (clutter rejection)           │
-                    │  CFAR detection                    │
-                    │  Micro-Doppler (high-PRF mode)     │
-                    │  Target tracking (Kalman)          │
-                    │                                    │
-                    │  UART/USB ──► PC (data + config)   │
-                    └────────────────┬───────────────────┘
-                                     │
-                    ┌────────────────┴───────────────────┐
-                    │  STM32C031 (housekeeping MCU)      │
-                    │                                    │
-                    │  SPI1 ──► ADF41510 (PLL config)   │
-                    │  SPI2 ──► MCP6S91 (AGC)            │
-                    │  I2C1 ──► TMP102 (temp)            │
-                    │  GPIO ──► RAMP_START, mode select │
-                    │  UART ──► debug / config           │
-                    └────────────────────────────────────┘
-```
-
-The MCU handles low-speed configuration. The FPGA handles all real-time DSP at 250 MSPS.
-
----
-
-## FPGA DSP Pipeline
-
-The FPGA processes each chirp through this pipeline (one chirp = 1 ms, parallelized):
-
-```
-                ┌─────────────────────────────────────────────────────────────┐
-                │                   ONE CHIRP PROCESSING                        │
-                │                                                              │
-  AD9643 ch A ─► ISERDES: 250 MSPS × 14-bit LVDS → 8-bit @ 31.25 MHz words │
-                       │                                                        │
-                       ▼                                                        │
-  DDC: complex mixer ─► CORDIC (mix with NCO) ─► decimate 4× → 62.5 MSPS  │
-                       │                                                        │
-                       ▼                                                        │
-  Decimate: CIC (4×) + FIR (4×) ─► 3.9 MSPS (filter, anti-alias)          │
-                       │                                                        │
-                       ▼                                                        │
-  Window: Hann/Blackman (multiply sample-by-sample)                        │
-                       │                                                        │
-                       ▼                                                        │
-  FFT: 1024-pt complex, streaming pipelined ─► |X[k]|² magnitudes         │
-                       │                                                        │
-                       ▼                                                        │
-  Buffer: store 64 range profiles in DDR (64 × 1024 × 4 bytes = 256 KB)    │
-                       │                                                        │
-                       ▼                                                        │
-  2nd FFT: across 64 chirps at each range bin ─► Doppler spectrum          │
-                       │                                                        │
-                       ▼                                                        │
-  MTI: subtract consecutive Doppler maps ─► reject stationary clutter     │
-                       │                                                        │
-                       ▼                                                        │
-  CFAR: cell-averaging CA-CFAR on range-Doppler map                        │
-                       │                                                        │
-                       ▼                                                        │
-  Detection: peak find → range, velocity, amplitude, micro-Doppler feat.   │
-                       │                                                        │
-                       ▼                                                        │
-  Tracking: Kalman filter across frames → track ID, trajectory              │
-                       │                                                        │
-                       ▼                                                        │
-  Output: UART/USB → list of detected targets with metadata               │
-                └─────────────────────────────────────────────────────────────┘
-```
-
-### FPGA Resource Estimate (XC7A100T)
-
-| Block | LUTs | DSP48 | BRAM (KB) |
-|-------|------|-------|-----------|
-| ISERDES + clocking | 2,000 | 0 | 0 |
-| DDC (CORDIC + NCO) | 1,500 | 16 | 4 |
-| Decimation CIC+FIR | 1,000 | 24 | 32 |
-| Window function | 500 | 4 | 0 |
-| FFT 1024-pt (1 channel) | 3,000 | 20 | 32 |
-| 2D FFT buffer (DDR ctrl) | 1,500 | 0 | 256 (DDR) |
-| MTI / CFAR | 2,000 | 8 | 64 |
-| Tracking | 1,000 | 4 | 8 |
-| **Total** | **~12,500 (20%)** | **~76 (32%)** | **~132 (3% of 4,860 KB)** |
-
-The XC7A100T easily handles two channels (I/Q) simultaneously with headroom for future expansion.
-
----
-
-## Complete Component List
-
-### Chirp Source (PLL)
-
-| Part | Manufacturer | Role | Key Specs | Notes |
-|------|-------------|------|-----------|-------|
-| **YSGM556006** | Innotion | VCO (in PLL loop) | 5320–6060 MHz, +6 dBm, 0–5 V tune | You have 10 on hand — use one as the PLL VCO |
-| **ADF41510** | Analog Devices | Fractional-N PLL | 1–10 GHz, −231 dBc/Hz PN, 250 MHz PFD, built-in ramp gen | **Key new component** — replaces DAC8830 + REF5050A |
-| **ECS-TXO-5032-100MHz** (or similar) | ECS Inc | TCXO reference | 100 MHz, ±1 ppm, low phase noise | PLL reference input |
-| **Loop filter components** | — | Active op-amp + RC | 100 kHz BW, 50° phase margin | ADF41510 reference design |
-
-### TX Chain
+### Chirp Source
 
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
-| **YG802020W** | Innotion | TX driver | 50 MHz–8 GHz, +15 dB gain, P1dB ~+16 dBm @ 5.5 GHz |
-| **GP2X+** | Mini-Circuits | 2-way power divider | 2.9–6.2 GHz, 3.6 dB total loss, 20 dB isolation |
-| 150 Ω + **37.4 Ω** + 150 Ω | — | 6 dB π-pad (corrected) | 0603 thin-film |
+| **YSGM556006** | Innotion | VCO (in PLL loop) | 5320–6060 MHz, +6 dBm, 0–5 V tune |
+| **ADF41510** | Analog Devices | Fractional-N PLL | 1–10 GHz, −231 dBc/Hz, built-in ramp gen |
+| **TCXO 100 MHz** | ECS Inc | PLL reference | ±1 ppm, low phase noise |
 
-### RX Chain
+### Analog Front-End
 
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
-| **QPL9547TR7** | Qorvo | LNA | ~1 dB NF, ~10 dB gain at 5.75 GHz (verify) |
-| **YX18** | Innotion | Diode quad mixer | GaAs Schottky, 1.4 V turn-on |
-| **NCS4-63+** (×2) | Mini-Circuits | Baluns | 4.5–6 GHz, 1:4 ratio |
+| **YG802020W** | Innotion | TX driver | +15 dB gain, P1dB +16 dBm @ 5.5 GHz |
+| **GP2X+** | Mini-Circuits | 2-way divider | 2.9–6.2 GHz, 3.6 dB loss, 20 dB isolation |
+| **QPL9547TR7** | Qorvo | RX LNA | ~1 dB NF, ~10 dB gain at 5.75 GHz |
+| **YX18** | Innotion | Mixer diode quad | GaAs Schottky, 1.4 V turn-on |
+| **NCS4-63+** (×2) | Mini-Circuits | Baluns | 4.5–6 GHz, 1:4 impedance ratio |
 | **OPA838IDBVR** | TI | IF preamplifier | 0.9 nV/√Hz, 300 MHz GBW |
-| **MCP6S91T-E/MS** | Microchip | AGC (PGA) | 1×–32× (0–30 dB), 18 MHz GBW, SPI |
+| **MCP6S91T-E/MS** | Microchip | AGC (PGA) | 1×–32× gain, 18 MHz GBW, SPI |
 
-### Digital / DSP
+### Digital Processing
 
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
-| **AD9643BCPZ-250** | ADI | ADC | Dual 14-bit, 250 MSPS, LVDS, QFN-48 |
-| **XC7A100T-CSG324** | Xilinx | FPGA | Artix-7, 101K logic cells, 240 DSP slices, 4,860 Kb BRAM |
+| **AD9643BCPZ-250** | ADI | ADC | Dual 14-bit, 250 MSPS, LVDS |
+| **XC7A100T-CSG324** | Xilinx | FPGA | Artix-7, 101K logic cells, 240 DSP slices |
 | **MT41K256M16TW-107** | Micron | DDR3L SDRAM | 256M × 16 = 512 MB |
-| **STM32C031C6T6** | ST | Housekeeping MCU | Cortex-M0+ @ 48 MHz, 32 KB flash, 12 KB SRAM |
+| **STM32H503** | ST | Housekeeping MCU | Cortex-M33 @ 250 MHz, 128 KB SRAM, USB |
+
+> The **STM32H503** is the right fit for housekeeping: faster and more capable than the STM32G071, but not overkill like the STM32H723. It handles SPI to the PLL, SPI to the AGC, I²C to the temp sensor, GPIO to the FPGA, and USB for debugging.
 
 ### Power
 
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
-| **ADP150AUJZ-5.0** | ADI | Ultra-low noise LDO (5 V) | VCO supply |
-| **LTM4644** | ADI | FPGA power | Multi-rail DC/DC (1.0V, 1.8V, 3.3V) |
+| **ADP150AUJZ-5.0** | ADI | Ultra-low noise LDO | 5 V, <10 µVrms, for VCO |
+| **LTM4644** | ADI | FPGA power module | Multi-rail DC/DC (1.0/1.8/3.3 V) |
 | **LD1117S33** | ST | 3.3 V LDO | MCU, ADC digital |
 
-### Removed components (replaced by PLL)
+### Antennas
 
-| Removed | Reason |
-|---------|--------|
-| ~~DAC8830IDR~~ | PLL generates the ramp |
-| ~~REF5050AIDGKR~~ | PLL uses TCXO reference |
-| ~~TLV9062IDR~~ | No DAC output to buffer |
-| ~~TMP102AIDRLR~~ (optional) | PLL eliminates temperature drift (but still useful for monitoring) |
+| Item | Spec | Size | Notes |
+|------|------|------|-------|
+| TX antenna | 24 dBi, 5.5–6 GHz | ~30×30 cm patch or 40 cm dish | Separate from RX |
+| RX antenna | 24 dBi, 5.5–6 GHz | Same | Same direction as TX |
 
-### Development Options
-
-| Option | Cost | Notes |
-|--------|------|-------|
-| **Digilent Arty A7-100T** | ~$200 | Ready-to-use XC7A100T board with DDR3, USB |
-| Custom PCB with XC7A100T | ~$50 (chip) + $100 (PCB) | Production target |
-| ADF41510 eval board | ~$100 | ADI EVAL-ADF41510 |
+**Total BOM cost: ~$250** (including Arty A7-100T dev board)
 
 ---
 
-## Signal Chain Walkthrough
+## Signal Chain
 
 ### TX Path
 
-```
-YSGM556006 VCO (PLL-locked, +6 dBm)
-    │
-  6 dB π-pad (150/37.4/150) → 0 dBm
-    │
-  YG802020W (+15 dB) → +15 dBm
-    │
-  GP2X+ divider (−3.6 dB) → +11.4 dBm each
-    │
-    ├── TX antenna (24 dBi) → +35.4 dBm EIRP (3.5 W)
-    │
-    └── LO to mixer (+11.4 dBm)
+```mermaid
+graph LR
+    A["YSGM556006<br/>+6 dBm"] --> B["6 dB π-pad<br/>0 dBm"]
+    B --> C["YG802020W<br/>+15 dBm"]
+    C --> D["GP2X+<br/>+11.4 dBm"]
+    D --> E["TX Antenna<br/>+35.4 dBm EIRP"]
+    D --> F["Mixer LO<br/>+11.4 dBm"]
 ```
 
 ### RX Path
 
-```
-RX antenna (echoes: −107 to −159 dBm)
-    │
-  QPL9547 LNA (+10 dB, NF~1 dB)
-    │
-  NCS4-63+ balun (1:4, −0.5 dB)
-    │
-  YX18 mixer (−7 dB) → IF beat note
-    │
-  RC LPF (1 kΩ + 33 pF, 4.8 MHz)
-    │
-  OPA838 (×10 = +20 dB, 300 MHz GBW)
-    │
-  MCP6S91 AGC (×1 to ×32, SPI)
-    │
-  AD9643 ch A (14-bit, 250 MSPS, LVDS)
-    │
-  XC7A100T ISERDES → DDC → decimate → window → FFT → 2D FFT → MTI → CFAR
+```mermaid
+graph LR
+    A["RX Antenna<br/>-107 to -159 dBm echoes"] --> B["QPL9547<br/>+10 dB, NF~1 dB"]
+    B --> C["NCS4-63+<br/>Balun"]
+    C --> D["YX18 Mixer<br/>-7 dB"]
+    D --> E["RC LPF<br/>4.8 MHz"]
+    E --> F["OPA838<br/>×10"]
+    F --> G["MCP6S91<br/>AGC 0-30 dB"]
+    G --> H["AD9643<br/>14-bit, 250 MSPS"]
+    H --> I["XC7A100T<br/>FPGA DSP"]
 ```
 
-### IF Gain vs. Bandwidth (MCP6S91 AGC)
+---
 
-| AGC setting | Gain | BW | Total gain | Use case |
-|-------------|------|-----|-----------|----------|
-| ×1 | +0 dB | 18 MHz | 20 dB | Close targets |
-| ×4 | +12 dB | 4.5 MHz | 32 dB | Medium range |
-| ×8 | +18 dB | 2.25 MHz | 38 dB | 1 km+ |
-| ×32 | +30 dB | 562 kHz | 50 dB | Long range |
+## Link Budget
+
+Conditions: TX power +11.4 dBm, antenna gain 24 dBi each, system NF ~1 dB, noise floor −143 dBm per 1 kHz bin.
+
+| Range | RCS | Target type | SNR (1 chirp) | **SNR (64-chirp coherent)** |
+|-------|-----|-------------|----------------|------------------------------|
+| 500 m | 0.1 m² | Medium drone | 26 dB | **44 dB** ✅ |
+| 500 m | 0.01 m² | Small drone | 16 dB | **34 dB** ✅ |
+| 1 km | 0.1 m² | Medium drone | 14 dB | **32 dB** ✅ |
+| 1 km | 0.01 m² | Small drone | 4 dB | **22 dB** ✅ |
+| 1.5 km | 0.1 m² | Medium drone | 7 dB | **25 dB** ✅ |
+| 1.5 km | 0.01 m² | Small drone | −3 dB | **15 dB** ✅ |
+| 2 km | 0.1 m² | Medium drone | 2 dB | **20 dB** ✅ |
+| 2 km | 0.01 m² | Small drone | −8 dB | **10 dB** ⚠️ |
+| 3 km | 0.1 m² | Medium drone | −6 dB | **12 dB** ⚠️ |
+
+**Key advantage:** The PLL + FPGA enables **true coherent integration** (+18 dB for 64 chirps) vs. the ~+9 dB noncoherent limit of an open-loop MCU approach. This is what makes 2 km small-drone detection feasible without a power amplifier.
 
 ---
 
-## Power Budgets & Link Budget
+## Chirp Modes
 
-### TX Power Budget
+The radar supports four configurable modes, switchable via SPI to the ADF41510:
 
-| Stage | Level | Notes |
-|-------|-------|-------|
-| PLL-locked VCO | +6 dBm | YSGM556006 in PLL loop |
-| 6 dB π-pad | −6 dB | |
-| YG802020W | +15 dB | 1 dB below P1dB |
-| GP2X+ | −3.6 dB | |
-| **Each port** | **+11.4 dBm** | |
-| With 24 dBi TX | **+35.4 dBm EIRP** (3.5 W) | Not ISM |
+| Mode | Ramp time | Max range | Scan rate | v_max | Use case |
+|------|-----------|-----------|-----------|-------|----------|
+| **Search** | 10 ms | 1.5 km | 100 Hz | 0.6 m/s | Long-range detection |
+| **Track** | 5 ms | 1.5 km | 200 Hz | 1.25 m/s | Following a detected target |
+| **Fast** | 1 ms | 500 m | 1 kHz | 6.25 m/s | Close-range, high speed |
+| **Micro-Doppler** | 0.1 ms | 50 m | 10 kHz | 62.5 m/s | Drone vs. bird discrimination |
 
-### RX Link Budget — Drone Detection (with coherent integration)
-
-Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dBm (1 kHz bin).
-
-**Key advantage:** PLL + FPGA enables true coherent integration → +18 dB for 64 chirps (vs +9 dB noncoherent on MCU approach).
-
-| Range | σ (m²) | Target | Pr (dBm) | SNR (1 chirp) | SNR (64-chirp coherent) |
-|-------|--------|--------|----------|----------------|------------------------|
-| 500 m | 0.1 | Medium drone | −117.2 | 26 dB | **44 dB** ✅ |
-| 500 m | 0.01 | Small drone | −127.2 | 16 dB | **34 dB** ✅ |
-| 1 km | 0.1 | Medium drone | −129.2 | 14 dB | **32 dB** ✅ |
-| 1 km | 0.01 | Small drone | −139.2 | 4 dB | **22 dB** ✅ |
-| 1.5 km | 0.1 | Medium drone | −136.2 | 7 dB | **25 dB** ✅ |
-| 1.5 km | 0.01 | Small drone | −146.2 | −3 dB | **15 dB** ✅ |
-| 2 km | 0.1 | Medium drone | −141.2 | 2 dB | **20 dB** ✅ |
-| 2 km | 0.01 | Small drone | −151.2 | −8 dB | **10 dB** ⚠️ |
-| 3 km | 0.1 | Medium drone | −148.7 | −6 dB | **12 dB** ⚠️ |
-
-**With coherent integration (PLL + FPGA):** 2 km small drone detection is achievable. 3 km medium drone is marginal.
-
-**Phase noise bonus:** ADF41510's −231 dBc/Hz at 100 kHz is much better than the free-running VCO. This reduces phase noise masking of small targets, potentially adding another 3–5 dB of effective sensitivity (not captured in the table above).
+**Micro-Doppler mode** is the key discriminator: at 10 kHz chirp PRF, the FPGA can resolve 100–500 Hz rotor blade modulation, which is unique to drones.
 
 ---
 
-## Chirp Configurations
+## Why PLL + FPGA?
 
-| Mode | Ramp T | LPF fc | Max range | f_IF @ max | ADC rate (after decimate) | FFT | Scan rate | v_max |
-|------|--------|--------|-----------|------------|--------------------------|-----|-----------|-------|
-| **Search** | 10 ms | 500 kHz | 1.5 km | 500 kHz | 3.9 MSPS | 4096-pt | 100 Hz | 0.625 m/s |
-| **Track** | 5 ms | 1 MHz | 1.5 km | 1 MHz | 7.8 MSPS | 2048-pt | 200 Hz | 1.25 m/s |
-| **Fast** | 1 ms | 5 MHz | 500 m | 1.67 MHz | 31.25 MSPS | 512-pt | 1 kHz | 6.25 m/s |
-| **Micro-Doppler** | 0.1 ms | 5 MHz | 50 m | 1.67 MHz | 250 MSPS | 256-pt | 10 kHz | 62.5 m/s |
+For serious drone detection, you need phase coherence, micro-Doppler processing, and low phase noise. Only a PLL + FPGA architecture delivers all three.
 
-**Micro-Doppler mode** is enabled by the FPGA: 0.1 ms ramps at 10 kHz PRF resolves 100–500 Hz rotor blade modulation. This is the mode that distinguishes drones from birds.
-
-**Note on PLL loop bandwidth vs chirp rate:** The PLL loop BW must be > 10× the chirp rate for accurate tracking. At 10 ms ramp (100 Hz chirp), 1 kHz loop BW is fine. At 0.1 ms micro-Doppler (10 kHz), need 100 kHz loop BW. Use a programmable loop filter (switched capacitor array) or two separate filters for different modes.
-
----
-
-## Design Decisions Explained
-
-### 1. ADF41510 PLL (Not Open-Loop DAC)
-
-The open-loop DAC approach was simpler but had critical limitations:
-- VCO phase noise ~−80 dBc/Hz (masks small targets)
-- Chirp-to-chirp coherence unproven (limits integration gain to noncoherent)
-- VCO non-linearity requires LUT pre-distortion
-- Temperature drift needs active compensation
-
-The ADF41510 PLL solves all of these:
-- **Phase noise**: −231 dBc/Hz fractional-N — 150 dB better than free-running VCO
-- **Coherence**: PLL locks to TCXO reference → chirp-to-chirp phase is deterministic
-- **Linearity**: Built-in ramp generator produces highly linear sweeps
-- **Temperature stability**: Locked to TCXO, no drift
-
-**Cost trade-off:** ~$10 more BOM (PLL vs DAC+REF+buffer+temp sensor), but the sensitivity improvement is worth it for drone detection.
-
-### 2. XC7A100T FPGA (Not MCU)
-
-The MCU approach (STM32H723) was too slow for real-time coherent integration, micro-Doppler, and 2D range-Doppler processing. The XC7A100T Artix-7 FPGA delivers all of this in hardware.
-
-### 3. AD9643 at 250 MSPS (Not 25 MSPS)
-
-250 MSPS provides 2× oversampling at 125 MHz IF bandwidth, ample for the FPGA's DDC + decimation pipeline. Dual channel for future I/Q.
-
-### 4. YSGM556006 as PLL VCO (Reused)
-
-You already have 10 of these. The ADF41510 doesn't have an integrated VCO, so the YSGM556006 becomes the VCO in the PLL loop. No waste.
-
-### 5. Single IF Channel for Prototype 1
-
-AD9643 ch A only. Ch B ready for future I/Q upgrade (90° hybrid + second mixer chain).
-
-### 6. 6 dB π-Pad After VCO (Corrected Values)
-
-150 Ω shunt / 37.4 Ω series / 150 Ω shunt. Prevents VCO frequency pulling (9 MHz pp at 3:1 VSWR).
-
-### 7. OPA838 at ×10
-
-20 dB fixed gain, 30 MHz bandwidth (300 MHz GBW). Not the bottleneck.
-
-### 8. MCP6S91 AGC
-
-0–30 dB SPI-controlled gain. At ×32, BW=562 kHz — sufficient for 500 kHz IF at 1.5 km with 10 ms ramp.
-
-### 9. 24 dBi Antennas
-
-Separate TX and RX, 1–2 m apart. 5° beamwidth. Adequate link budget for 2 km small drone detection.
+| Requirement | Open-loop DAC + MCU | **PLL + FPGA (this design)** |
+|-------------|--------------------|-----------------------|
+| Phase noise | ~−80 dBc/Hz (free VCO) | **−231 dBc/Hz** (fractional-N) |
+| Chirp coherence | Unproven | **Proven** (PLL locks to TCXO) |
+| Coherent integration | +9 dB (noncoherent) | **+18 dB** (coherent) |
+| Micro-Doppler | Infeasible | **Trivial** (10 kHz PRF mode) |
+| 2D range-Doppler | Slow (software) | **< 100 µs** (hardware FFT) |
+| Temperature stability | Needs compensation | **Eliminated** (PLL locks) |
+| Range (small drone) | ~1 km | **~2 km** |
 
 ---
 
-## Known Issues & Open Questions
+## Design Decisions
 
-### Known issues (must be addressed)
+### 1. ADF41510 PLL (not open-loop DAC)
 
-| Issue | Impact | Mitigation |
-|-------|--------|-----------|
-| **PLL loop BW vs chirp rate** | PLL must track fast ramps | Use 100 kHz loop BW for search (10 ms ramp), switch to 500 kHz for micro-Doppler (0.1 ms ramp) |
-| **PLL loop filter design** | Critical for stability and phase noise | Use ADI reference design (ADIsimPLL tool), 50° phase margin |
-| **Fractional-N spurs** | Spurs at PFD/2, etc. | Use dithering mode or integer-N for cleanest spectrum |
-| **QPL9547 NF at 5.75 GHz unverified** | System NF may be 1.5–2 dB | Measure on NF meter; add 2 dB margin |
-| **v_max at 10 ms = 0.625 m/s** | Drones alias | Use Fast or Micro-Doppler mode for moving drones |
-| **+35 dBm EIRP not ISM** | Regulatory | Acquire experimental/STA license |
-| **FPGA PCB complexity** | BGA fanout, DDR3 routing | **Start with Arty A7-100T dev board** |
-| **FR4 at 5.5–6 GHz** | Higher insertion loss | Acceptable for prototype; Rogers for production |
+The open-loop DAC approach was simpler but had critical limitations: VCO phase noise masks small targets, chirp coherence was unproven, and temperature drift needed active compensation. The ADF41510 solves all of these with a built-in ramp generator, ultra-low phase noise, and PLL locking to a stable TCXO reference.
 
-### Open questions (resolve during implementation)
+### 2. XC7A100T FPGA (not MCU)
 
-- **PLL loop filter topology**: Active vs passive, component values
-- **PLL reference frequency**: 100 MHz TCXO vs other (affects PFD frequency and spur locations)
-- **Loop BW for each mode**: Search (1 kHz?), Track (10 kHz?), Micro-Doppler (100 kHz?)
-- **QPL9547 NF/gain at 5.75 GHz**: measure on VNA + NF meter
-- **Antenna type**: 8×8 patch array (~30×30 cm) or parabolic dish (~40 cm)
-- **AD9643 input range**: 2 Vpp or 3.5 Vpp
-- **Future**: PA upgrade (MMG3H21NT1, +27 dBm TX), I/Q upgrade, MIMO with multiple antennas
+A microcontroller can do basic range FFT in ~50 µs, but cannot do real-time coherent integration, micro-Doppler, or 2D range-Doppler processing. The XC7A100T runs FFTs in < 1 µs in hardware, with deterministic latency.
+
+### 3. AD9643 at 250 MSPS (not slower)
+
+250 MSPS provides ample oversampling for the FPGA's DDC + decimation pipeline. The dual channel is ready for future I/Q expansion.
+
+### 4. YSGM556006 as PLL VCO
+
+The VCO you already own is reused as the VCO in the PLL loop. The ADF41510 doesn't have an integrated VCO, so this is a natural fit.
+
+### 5. STM32H503 for housekeeping (not G071, not H723)
+
+The G071 would technically work for housekeeping, but the H503 gives more headroom for future features at low cost. The H723 is overkill — those are reserved for other projects.
+
+### 6. 24 dBi antennas, separate TX/RX
+
+Separate antennas (no circulator) provide better isolation than a single antenna + circulator, and the high gain is needed for the 2+ km link budget.
+
+### 7. No power amplifier (prototype 1)
+
+The YG802020W delivers +15 dBm, which combined with 24 dBi antennas and coherent integration reaches 2 km for small drones. A PA upgrade (MMG3H21NT1, +27 dBm) is a future revision for 3+ km small drone detection.
 
 ---
 
-## Project Status
+## Status & Roadmap
 
 | Phase | Status |
 |-------|--------|
-| Architecture definition | ✅ Done (PLL + FPGA) |
+| Architecture definition | ✅ Done |
 | Component selection | ✅ Done |
-| Link budget validation | ✅ Done — **2–3 km for drones with coherent integration** |
+| Link budget validation | ✅ Done |
+| Loop filter design (ADIsimPLL) | ⬜ Pending |
+| Hardware bring-up (PLL + TX/RX) | ⬜ Pending |
 | VCO/PLL calibration | ⬜ Pending |
 | FPGA firmware (VHDL/Verilog) | ⬜ Pending |
-| MCU firmware (STM32C031) | ⬜ Pending |
-| ADC interface (LVDS deserialization) | ⬜ Pending |
+| MCU firmware (STM32H503) | ⬜ Pending |
+| ADC interface (LVDS) | ⬜ Pending |
 | DSP pipeline (DDC → FFT → CFAR) | ⬜ Pending |
-| Integration + validation | ⬜ Pending |
+| Integration + drone flight test | ⬜ Pending |
 
 ---
 
-*Lyrion Radar — open hardware drone detection radar with PLL chirp source and FPGA-based DSP.*
+## Known Limitations
+
+| Issue | Status |
+|-------|--------|
+| **+35 dBm EIRP at 5.5–6 GHz is not ISM** | Requires licensed or experimental authorization in most jurisdictions |
+| **QPL9547 NF at 5.75 GHz unverified** | Datasheet 0.6 dB is mid-band; expect ~1 dB at band edge. Measure on NF meter. |
+| **PLL loop BW vs chirp rate** | Loop BW must be > 10× chirp rate. Need programmable filter for different modes. |
+| **Fractional-N spurs** | Spurs at PFD/2 offsets. Use dithering mode to reduce. |
+| **FR4 at 5.5–6 GHz** | Higher loss than at lower frequencies. Acceptable for prototype; use Rogers for production. |
+| **Micro-Doppler at long range** | 10 kHz PRF limits max unambiguous range to 50 m. Use only for close-range classification. |
+
+---
+
+## License
+
+TBD
