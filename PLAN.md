@@ -15,58 +15,54 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 
 ## System Architecture
 
+The radar is organised into **four functional blocks**: a PLL-based chirp source, a TX chain, an RX chain, and digital processing.
+
 ```mermaid
-graph LR
-    %% Chirp Source
-    TCXO[TCXO<br/>100 MHz]
-    PLL[ADF41510<br/>Fractional-N PLL]
-    LPF[Loop Filter]
-    VCO[YSGM556006 VCO<br/>5.5–6 GHz]
+flowchart LR
+    subgraph CHIRP["Chirp Source"]
+        TCXO[TCXO] --> PLL[PLL] --> LF[Loop<br/>Filter] --> VCO[VCO]
+    end
 
-    %% TX Path
-    PAD[6 dB pad]
-    PA[YG802020W<br/>+15 dB]
-    DIV[GP2X+<br/>divider]
-    TXANT[TX Ant<br/>24 dBi]
+    subgraph TX["TX Chain"]
+        VCO --> PAD[Pad] --> PA[PA] --> DIV[Divider]
+        DIV --> TXA[TX Antenna]
+    end
 
-    %% RX Path
-    RXANT[RX Ant<br/>24 dBi]
-    LNA[QPL9547<br/>LNA]
-    MIXER[YX18<br/>mixer]
-    IFAMP[OPA838 ×10]
-    AGC[MCP6S91<br/>AGC]
+    subgraph RX["RX Chain"]
+        RXA2[RX Antenna] --> LNA2[LNA] --> MIX[Mixer]
+        DIV -. LO .-> MIX
+        MIX --> IFA[IF Amp] --> AGC2[AGC]
+    end
 
-    %% Digital
-    ADC[AD9643<br/>250 MSPS]
-    FPGA[XC7A100T<br/>FPGA DSP]
-    MCU[STM32H503<br/>MCU]
-    PC[PC display]
+    subgraph DSP["Digital Processing"]
+        AGC2 --> ADC2[ADC] --> FPGA2[FPGA] --> PC2[PC]
+        MCU2[MCU] -. SPI .-> PLL
+        MCU2 -. SPI .-> AGC2
+    end
 
-    %% Chirp Source flow
-    TCXO --> PLL --> LPF --> VCO
-
-    %% TX flow
-    VCO --> PAD --> PA --> DIV
-    DIV -->|+11 dBm| TXANT
-    DIV -->|LO| MIXER
-
-    %% RX flow
-    RXANT --> LNA --> MIXER
-    MIXER --> IFAMP --> AGC --> ADC --> FPGA --> PC
-
-    %% MCU control
-    MCU -. SPI .-> PLL
-    MCU -. SPI .-> AGC
-
-    %% Subtle styling
-    classDef chirp fill:#f6f8fa,stroke:#8b949e,color:#24292f
-    classDef rf fill:#f6f8fa,stroke:#8b949e,color:#24292f
-    classDef digital fill:#f6f8fa,stroke:#8b949e,color:#24292f
-
-    class TCXO,PLL,LPF,VCO chirp
-    class PAD,PA,DIV,TXANT,RXANT,LNA,MIXER,IFAMP,AGC rf
-    class ADC,FPGA,MCU,PC digital
+    style CHIRP fill:#fafbfc,stroke:#d0d7de
+    style TX fill:#fafbfc,stroke:#d0d7de
+    style RX fill:#fafbfc,stroke:#d0d7de
+    style DSP fill:#fafbfc,stroke:#d0d7de
 ```
+
+### Block summary
+
+| Block | Function | Key parts |
+|-------|----------|-----------|
+| **Chirp Source** | Generates a linear 5.5–6 GHz chirp | ADF41510 PLL, YSGM556006 VCO, 100 MHz TCXO, loop filter |
+| **TX Chain** | Amplifies and transmits the chirp | YG802020W PA (+15 dB), GP2X+ divider, 24 dBi antenna |
+| **RX Chain** | Receives, amplifies, and downconverts echoes | QPL9547 LNA, YX18 mixer, OPA838 IF amp, MCP6S91 AGC, 24 dBi antenna |
+| **Digital Processing** | Digitises and processes the IF signal | AD9643 ADC, XC7A100T FPGA, STM32H503 MCU |
+
+### Signal flow
+
+1. The **PLL** generates a linear frequency ramp (5.5–6 GHz) locked to a TCXO reference.
+2. The **VCO output** splits: one path goes to the TX chain (amplified and radiated), the other to the mixer as the local oscillator.
+3. **Target echoes** enter the RX chain, are amplified by the LNA, and mixed with the LO to produce a low-frequency IF beat note.
+4. The IF signal is filtered, amplified, and digitised by the **ADC** at 250 MSPS.
+5. The **FPGA** runs the DSP pipeline: DDC → decimation → FFT → 2D range-Doppler → detection.
+6. The **MCU** configures the PLL, AGC, and temp sensor via SPI/I²C, and relays data to the PC via UART/USB.
 
 ---
 
