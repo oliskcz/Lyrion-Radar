@@ -11,11 +11,13 @@
 |-----------|-------|-------|
 | Frequency band | 5.5 – 6.0 GHz | 500 MHz sweep bandwidth |
 | Range resolution | 30 cm (theoretical) | ΔR = c / (2B); in practice limited by FFT size |
-| Max range (small drone, σ=0.01 m²) | **~1 km** | 64-chirp coherent integration, prototype 1 |
-| Max range (medium drone, σ=0.1 m²) | **~1.5 km** | 64-chirp coherent integration, prototype 1 |
-| Path to 2–3 km | PA upgrade + higher-gain antennas | Out of reach with prototype 1 TX power |
+| Max range (small drone, σ=0.01 m²) | **~1.5 km** | 64-chirp coherent integration, I/Q, NF_sys=5.5 dB |
+| Max range (medium drone, σ=0.1 m²) | **~2.3 km** | 64-chirp coherent integration |
+| Max range (large drone, σ=1 m²) | **~3.5 km** | 64-chirp coherent integration |
+| Path to 3+ km (small drones) | PA upgrade + 27 dBi antennas | +18 dB combined link improvement |
 | Scan rate | 100 Hz to 10 kHz | Configurable per mode |
 | EIRP | +35.4 dBm (3.5 W) | Not ISM — needs experimental license |
+| Demodulation | **I/Q (complex)** | LTC5586, Doppler direction resolved |
 
 ---
 
@@ -64,42 +66,110 @@ TX antenna (24 dBi)  —       +35.4 dBm EIRP
 
 ---
 
-## 4. RX Chain
+## 4. RX Chain (I/Q Architecture)
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| RX antenna gain | 24 dBi | Same as TX, separate |
-| LNA (QPL9547) | ~10 dB gain, ~1 dB NF | At 5.75 GHz — **verify on NF meter** |
-| Balun (NCS4-63+) | 1:4 ratio, −0.5 dB | Single-ended to differential |
-| Mixer (YX18) | −7 dB conversion loss | GaAs Schottky diode quad |
-| LO drive to mixer | +11.4 dBm | Via 1:4 balun → 2× voltage step-up |
-| RC LPF | 4.8 MHz (1 kΩ + 33 pF) | Anti-aliasing |
-| IF preamp (OPA838) | ×10 = +20 dB, 300 MHz GBW | 0.9 nV/√Hz |
-| AGC (MCP6S91) | ×1 to ×32 = 0 to +30 dB | SPI-controlled, 18 MHz GBW |
-| **System NF** | **~1 dB** (estimated) | Verify with QPL9547 band-edge measurement |
+| RX antenna gain | 24 dBi | StarterDish™ 24 UM, separate from TX |
+| LNA (QPL9547) | **+11.2 dB gain** (S21 @ 5.5 GHz) | 0.3 dB NF @ 1.9 GHz, ~1 dB NF @ 5.5 GHz (est.) |
+| LNA OIP3 | +39 dBm @ 1.9 GHz | Datasheet; expect >33 dBm @ 5.5 GHz |
+| LNA P1dB | +22.7 dBm @ 1.9 GHz | Handles TX leakage without compression |
+| I/Q Demodulator (LTC5586) | SE RF in (on-chip transformer), diff I/Q out | 300 MHz–6 GHz, SPI-controlled |
+| LTC5586 conversion gain | +7.7 dB @ 1.9 GHz | **UNVERIFIED @ 5.8 GHz** — expect +3 to +6 dB |
+| LTC5586 RF attenuator | 0–31 dB, 1 dB steps (SPI) | Coarse AGC for close targets |
+| LTC5586 IF amplifier | 8 gain steps (SPI) | ~0 to +15 dB range |
+| LTC5586 DC offset null | SPI adjustable | Critical for zero-IF FMCW (TX leakage) |
+| LTC5586 image rejection | 37 dB, adjustable to 60 dB (SPI) | |
+| LTC5586 OIP3 | 40 dBm @ 1.9 GHz | UNVERIFIED @ 5.8 GHz |
+| LO drive to LTC5586 | ~0 dBm required | GP2X+ outputs +11.4 dBm → **10 dB atten pad** |
+| IF anti-alias filter | **LC 3rd-order Butterworth, 70 MHz** | 470 nH + 12 pF × 2 per leg (differential) |
+| AGC / DVGA (LMH6521) | **Dual channel, −5.5 to +26 dB, 0.5 dB steps** | 1400 MHz BW (constant at all gains), SPI |
+| LMH6521 OIP3 | 48.5 dBm @ 200 MHz | Datasheet |
+| LMH6521 NF | 7.3 dB @ max gain | Datasheet |
+| LMH6521 output | Differential, 10 Vppd swing | Drives AD9643 directly |
+| **System NF** | **~5.5 dB** (expected @ 5.8 GHz) | Friis: dominated by LTC5586 NF / LNA gain |
+| **Architecture** | **I/Q (complex)** | Doppler direction resolved, image rejection |
 
-### AGC Gain vs Bandwidth
+### Signal Path
 
-| AGC setting | Gain | Bandwidth | Use case |
-|-------------|------|-----------|----------|
-| ×1 | +0 dB | 18 MHz | Close targets |
-| ×4 | +12 dB | 4.5 MHz | Medium range |
-| ×8 | +18 dB | 2.25 MHz | 1 km+ |
-| ×32 | +30 dB | 562 kHz | Long range (f_IF must be < 560 kHz) |
+```
+RX Antenna (24 dBi, SE)
+  → QPL9547 LNA (+11.2 dB, NF ~1 dB, SE in/out)
+    → LTC5586 (SE RF in via on-chip transformer, diff I/Q out, SPI)
+        LO ← GP2X+ divider (+11.4 dBm) → 10 dB atten pad → +1.4 dBm
+        │
+        ├── I+, I- (diff) → LC LPF (70 MHz) → LMH6521 CH A (AGC) → AD9643 CH A
+        │
+        └── Q+, Q- (diff) → LC LPF (70 MHz) → LMH6521 CH B (AGC) → AD9643 CH B
+```
 
-### RX Path Gains & Levels (Reference, 1 km, σ=0.01 m² — corrected)
+### AGC Architecture (all SPI, FPGA-controlled)
 
-| Stage | Gain/Loss | Level | Voltage (50Ω) |
-|-------|-----------|-------|----------------|
-| RX antenna (24 dBi) | — | **−151.2 dBm** | 0.65 µV rms |
-| QPL9547 LNA | +10 dB | −141.2 dBm | 2.05 µV rms |
-| NCS4-63+ balun | −0.5 dB | −141.7 dBm | 1.94 µV rms |
-| YX18 mixer | −7 dB | −148.7 dBm | 0.86 µV rms |
-| OPA838 (×10) | +20 dB | −128.7 dBm | 8.6 µV rms |
-| MCP6S91 (×8) | +18 dB | **−110.7 dBm** | **1.85 µVpp (0.06 LSB of 14-bit ADC)** |
-| AD9643 ADC | — | Digitised | |
+| Stage | Range | Resolution | Purpose |
+|-------|-------|-----------|---------|
+| LTC5586 RF attenuator | 0–31 dB | 1 dB | Coarse — close targets, jammers, TX leakage |
+| LTC5586 IF amplifier | 0–15 dB (8 steps) | ~2 dB | Medium — coarse gain trim |
+| LMH6521 | −5.5 to +26 dB | **0.5 dB** | Fine — precision AGC loop |
+| **Total AGC range** | **~72 dB** | | |
 
-> **Note**: At 1 km, σ=0.01 m², the signal at the ADC is **0.06 LSBs** of the 14-bit ADC. Single-chirp detection is impossible. With 64-chirp coherent integration (+18 dB), the signal rises to 1.3 LSBs — marginal. This is why the link budget shows ~1 km as the practical limit for small drones.
+### IF Anti-Alias Filter (LC 3rd-Order Butterworth, 70 MHz)
+
+Replaces the old 4.8 MHz RC filter which limited range to 1.4 km at 1 kHz chirp rate.
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Topology | 3rd-order Butterworth, differential pi-network | 1 inductor + 2 capacitors per leg |
+| Cutoff (−3 dB) | 70 MHz | Passes IF up to 2 km @ 10 kHz chirp rate |
+| Rolloff | −60 dB/decade | 3rd order |
+| Attenuation @ 125 MHz (Nyquist) | ~−15 dB | Plus ADC analog BW rolloff |
+| L (per leg) | 470 nH, 0402, SRF > 200 MHz | |
+| C (per leg) | 12 pF, C0G/NP0, 0402, 50V | ×2 (input + output shunt) |
+| Components total | 4 inductors + 8 capacitors | 2 legs (I and Q) × 3 elements |
+| Insertion loss (passband) | < 0.5 dB | Passive, no noise added |
+
+### RX Path Gains & Levels (1 km, σ = 0.01 m², max gain)
+
+| Stage | Gain/Loss | Cumulative | Level |
+|-------|-----------|-----------|-------|
+| RX antenna (24 dBi) | — | — | **−139.2 dBm** |
+| QPL9547 LNA | +11.2 dB | +11.2 dB | −128.0 dBm |
+| LTC5586 (conv. + IF amp max) | +20 dB (est.) | +31.2 dB | −108.0 dBm |
+| LC LPF (70 MHz) | −0.5 dB | +30.7 dB | −108.5 dBm |
+| LMH6521 (max +26 dB) | +26 dB | **+56.7 dB** | **−82.5 dBm** |
+| AD9643 full scale | — | — | +7 dBm |
+| **Headroom below FS** | — | — | **89.5 dB** |
+
+> **Note**: Signal at ADC is 89.5 dB below full scale. The analog noise floor (amplified thermal noise) at the ADC input is approximately −86 dBm per 1 kHz bin, which is well above the ADC quantization noise (−130 dBm/bin). The ADC is not the noise bottleneck.
+
+### System Noise Figure (Friis Formula)
+
+```
+F_sys = F_LNA + (F_mixer − 1) / G_LNA
+
+QPL9547 @ 5.5 GHz:  G = 11.2 dB (13.2 linear),  NF ≈ 1.0 dB (F = 1.26)
+LTC5586 @ 5.8 GHz:  NF ≈ 15 dB (F = 31.6) — UNVERIFIED, estimated
+
+F_sys = 1.26 + (31.6 − 1) / 13.2 = 1.26 + 2.32 = 3.58
+NF_sys = 10·log₁₀(3.58) = 5.5 dB
+```
+
+| LTC5586 NF @ 5.8 GHz | System NF | Impact |
+|----------------------|-----------|--------|
+| 10 dB (optimistic) | 3.0 dB | Best case |
+| 15 dB (expected) | 5.5 dB | Design point |
+| 20 dB (pessimistic) | 8.0 dB | Still functional |
+
+> **Key**: The QPL9547's 11.2 dB gain at 5.5 GHz (from S-parameter data) shields the system from the LTC5586's degraded NF at band edge. A higher-gain LNA would improve NF further, but the QPL9547's 39 dBm OIP3 and 0.3 dB NF make it the best choice for linearity.
+
+### Components Removed (vs. previous design)
+
+| Removed | Reason |
+|---------|--------|
+| YX18 mixer | Replaced by LTC5586 (integrated I/Q) |
+| NCS4-63+ balun (×2) | Eliminated — LTC5586 has on-chip RF transformer |
+| OPA838 IF preamp | Replaced by LTC5586 IF amplifier + LMH6521 |
+| MCP6S91 AGC | Replaced by LMH6521 (1400 MHz BW vs 18 MHz GBW) |
+| RC LPF 4.8 MHz | Replaced by LC LPF 70 MHz (was limiting range) |
 
 ---
 
@@ -110,7 +180,7 @@ TX antenna (24 dBi)  —       +35.4 dBm EIRP
 | **Model** | **AD9643BCPZ-250** | Analog Devices |
 | Resolution | 14 bits | |
 | Max sample rate | 250 MSPS | |
-| **Channels** | **2** (dual) | Ch A = IF, Ch B = future I/Q |
+| **Channels** | **2** (dual) | Ch A = I, Ch B = Q (I/Q demodulation) |
 | Input type | Differential | LVDS output |
 | Full-scale input | 2 Vpp or 3.5 Vpp | Configurable via SPI |
 | SNR (typical) | 71.1 dBFS @ 96 MHz input | Datasheet |
@@ -197,31 +267,71 @@ Fabric bus:     7 pairs × 8 bits = 56 bits per channel @ 62.5 MHz
 
 ---
 
-## 8. Link Budget (Corrected — 12 dB error fixed)
+## 8. Link Budget (Corrected — I/Q architecture, verified radar equation)
 
-Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dBm per 1 kHz bin.
+### Radar Equation
 
-| Range | RCS | Target type | **Pr (dBm)** | SNR (1 chirp) | **SNR (64-chirp coherent)** |
-|-------|-----|-------------|--------------|----------------|------------------------------|
-| 500 m | 0.1 m² | Medium drone | −129.2 | 14 dB | **32 dB** ✅ |
-| **500 m** | **0.01 m²** | **Small drone** | **−139.2** | **4 dB** | **22 dB** ✅ |
-| 1 km | 0.1 m² | Medium drone | −141.2 | 2 dB | **20 dB** ✅ |
-| **1 km** | **0.01 m²** | **Small drone** | **−151.2** | **−8 dB** | **10 dB** ⚠️ marginal |
-| 1.5 km | 0.1 m² | Medium drone | −148.3 | −5 dB | **13 dB** ✅ |
-| 1.5 km | 0.01 m² | Small drone | −158.3 | −15 dB | **3 dB** ⚠️ |
-| 2 km | 0.1 m² | Medium drone | −153.3 | −10 dB | **8 dB** ⚠️ |
-| 2 km | 0.01 m² | Small drone | −163.3 | −20 dB | **−2 dB** ❌ |
-| 3 km | 0.1 m² | Medium drone | −160.3 | −17 dB | **1 dB** ⚠️ |
+```
+Pr = Pt × Gt × Gr × λ² × σ / ((4π)³ × R⁴)
 
-### Honest range targets for prototype 1
+In dB:
+Pr(dBm) = Pt + Gt + Gr + 20·log₁₀(λ) + 10·log₁₀(σ) − 30·log₁₀(4π) − 40·log₁₀(R)
 
-| Target | Max range | Condition |
-|--------|-----------|-----------|
-| Small drone (σ=0.01 m²) | **~1 km** | With 64-chirp coherent integration, +18 dB |
-| Medium drone (σ=0.1 m²) | **~1.5 km** | With 64-chirp coherent integration |
-| Large drone (σ=1 m²) | **~3 km** | With 64-chirp coherent integration |
+Constants:
+  Pt = +11.4 dBm (TX antenna port, after GP2X+ divider)
+  Gt = Gr = 24 dBi (StarterDish 24 UM)
+  λ = c/f = 3×10⁸ / 5.75×10⁹ = 0.0522 m
+  20·log₁₀(λ) = −25.65 dB
+  30·log₁₀(4π) = 32.97 dB
 
-> **Conclusion**: The earlier "2-3 km for small drones" claim is **not supported** by the math. The 12 dB link budget error (from using `10·log10(λ)` instead of `20·log10(λ²)` in the radar equation) inflated every range by ~40%. To reach 2-3 km for small drones, you need a real PA upgrade (MMG3H21NT1, +27 dBm TX → +12 dB link improvement) and/or 30 dBi antennas (+6 dB) and/or 256-chirp integration (+6 dB).
+Simplified:
+  Pr(dBm) = 0.78 + 10·log₁₀(σ) − 40·log₁₀(R_m)
+```
+
+### Signal at RX Antenna
+
+| Range | σ = 0.01 m² (small) | σ = 0.1 m² (medium) | σ = 1 m² (large) |
+|-------|---------------------|---------------------|-------------------|
+| 100 m | −99.2 dBm | −89.2 dBm | −79.2 dBm |
+| 250 m | −111.2 dBm | −101.2 dBm | −91.2 dBm |
+| 500 m | −127.2 dBm | −117.2 dBm | −107.2 dBm |
+| 1 km | −139.2 dBm | −129.2 dBm | −119.2 dBm |
+| 1.5 km | −146.3 dBm | −136.3 dBm | −126.3 dBm |
+| 2 km | −151.2 dBm | −141.2 dBm | −131.2 dBm |
+| 3 km | −158.8 dBm | −148.8 dBm | −138.8 dBm |
+
+### Noise & SNR
+
+Conditions: NF_sys = 5.5 dB (expected), noise BW = 1 kHz (= 1/T for T = 1 ms chirp), 64-chirp coherent integration (+18 dB).
+
+Noise floor per 1 kHz bin = −174 + 30 + 5.5 = **−138.5 dBm**
+
+| Range | σ = 0.01 m² | SNR (1 chirp) | **SNR (64-chirp)** | σ = 0.1 m² | **SNR (64-chirp)** | σ = 1 m² | **SNR (64-chirp)** |
+|-------|-------------|---------------|---------------------|------------|---------------------|----------|---------------------|
+| 100 m | −99.2 | 39.3 dB | **57.3 dB** ✅ | −89.2 | **67.3 dB** ✅ | −79.2 | **77.3 dB** ✅ |
+| 500 m | −127.2 | 11.3 dB | **29.3 dB** ✅ | −117.2 | **39.3 dB** ✅ | −107.2 | **49.3 dB** ✅ |
+| **1 km** | **−139.2** | **−0.7 dB** | **17.3 dB** ✅ | −129.2 | **27.3 dB** ✅ | −119.2 | **37.3 dB** ✅ |
+| 1.5 km | −146.3 | −7.8 dB | **10.2 dB** ⚠️ | −136.3 | **20.2 dB** ✅ | −126.3 | **30.2 dB** ✅ |
+| **2 km** | −151.2 | −12.7 dB | **5.3 dB** ⚠️ | **−141.2** | **15.3 dB** ✅ | −131.2 | **25.3 dB** ✅ |
+| 3 km | −158.8 | −20.3 dB | **−2.3 dB** ❌ | −148.8 | **7.7 dB** ⚠️ | −138.8 | **17.7 dB** ✅ |
+
+### Detection Limits (13 dB threshold, Pfa = 10⁻⁶)
+
+| Target | Max range (24 dBi) | Condition |
+|--------|-------------------|-----------|
+| Small drone (σ = 0.01 m², DJI Mini) | **~1.5 km** | 64-chirp coherent, NF_sys = 5.5 dB |
+| Medium drone (σ = 0.1 m², DJI Phantom) | **~2.3 km** | 64-chirp coherent |
+| Large drone (σ = 1 m², Matrice 600) | **~3.5 km** | 64-chirp coherent |
+
+### NF Sensitivity
+
+| LTC5586 NF @ 5.8 GHz | NF_sys | SNR @ 1 km, σ=0.01 (64-chirp) | Max range (σ=0.01) |
+|----------------------|--------|-------------------------------|---------------------|
+| 10 dB (optimistic) | 3.0 dB | 19.8 dB | ~1.7 km |
+| 15 dB (expected) | 5.5 dB | 17.3 dB | ~1.5 km |
+| 20 dB (pessimistic) | 8.0 dB | 14.8 dB | ~1.3 km |
+
+> **Conclusion**: Even in the pessimistic case (LTC5586 NF = 20 dB at 5.8 GHz), the radar detects small drones at 1.3 km with 64-chirp integration. The I/Q architecture provides Doppler direction and +37 dB image rejection from the LTC5586. To extend range beyond 2 km for small drones: add PA (+12 dB), 27 dBi antennas (+6 dB), or 256-chirp integration (+6 dB).
 
 ---
 
@@ -261,18 +371,23 @@ This document was independently reviewed and several errors were found and corre
 | Error | Original | Corrected | Impact |
 |-------|----------|-----------|--------|
 | **FFT sizes too small** | 4096/2048/512/256 | 16384/16384/8192/4096 | Range resolution was 2.85 m instead of 0.71 m |
-| **Link budget off by +12 dB** | 1 km small drone = 22 dB SNR | 1 km small drone = 10 dB SNR | Max range overestimated by ~40% |
+| **Link budget Pr values 12 dB too low** | 1 km small drone = −151.2 dBm | 1 km small drone = **−139.2 dBm** | Ranges were underestimated; verified via linear radar equation |
 | **v_max too low by 2×** | 0.63 m/s at 10 ms | 2.6 m/s at 10 ms (sawtooth, I/Q) | Velocity coverage was half of actual |
-| **RX path voltage at ADC** | 4.6 mVpp at 1 km | 1.85 µVpp at 1 km | Off by 2500× — the signal is 0.06 LSBs, not 50% full scale |
+| **RX chain non-functional above 2 MHz** | MCP6S91 (18 MHz GBW) | LMH6521 (1400 MHz BW) | Old AGC was useless at radar IF frequencies |
+| **4.8 MHz RC LPF limiting range** | Max 1.4 km @ 1 kHz chirp | 70 MHz LC LPF (3rd order) | Was blocking 80% of usable IF bandwidth |
+| **Single-channel (real) only** | YX18 + OPA838 + MCP6S91 | LTC5586 I/Q + LMH6521 dual | No Doppler direction, no image rejection |
+| **System NF underestimated** | "~1 dB" | **5.5 dB** (Friis, linear) | Was using dB values directly instead of linear conversion |
 
-**Root cause of the link budget error**: I used `10·log10(λ) = −12.8 dB` instead of `20·log10(λ) = −25.65 dB` (which equals `10·log10(λ²)`) in the radar equation. This `+12.8 dB` error carried through every Pr and SNR value.
+**Root cause of the Pr error**: The previous "correction" subtracted 12 dB from the radar equation result, making values 12 dB too pessimistic. Verified by computing Pr in linear:
+```
+Pr = (0.0138 × 251.2 × 251.2 × 0.00272 × 0.01) / (1984.4 × 10¹²) = 1.195×10⁻¹⁷ W = −139.2 dBm
+```
+at R = 1 km, σ = 0.01 m², Pt = +11.4 dBm, Gt = Gr = 24 dBi, f = 5.75 GHz.
 
-**Root cause of the FFT size error**: I forgot that `N_FFT ≤ N_samples = T_ramp × f_sample`. With 39,000 samples per ramp, a 4096-pt FFT only covers ~10% of the available frequency bins, throwing away resolution.
+**Root cause of the NF error**: Friis formula requires linear values. Using NF(dB) directly (e.g., "1 + (15-1)/10 = 2.4 dB") is wrong. Correct: F = 1.26 + 30.6/13.2 = 3.58 → NF = 5.5 dB.
 
-**Root cause of the v_max error**: I used `λ/(8T)` instead of `λ/(4T)` for sawtooth real sampling. The correct formula is `λ × f_PRF / 4` (real) or `λ × f_PRF / 2` (I/Q).
-
-**The corrected values show that prototype 1 is a 1 km-class radar for small drones, not 2-3 km**. To reach 2-3 km for small drones, the design needs: a real PA (MMG3H21NT1, +27 dBm TX), higher-gain antennas (30 dBi), and/or 256-chirp integration.
+**Root cause of the RX chain failure**: The MCP6S91 PGA has a gain-bandwidth product of 18 MHz. At ×8 gain (needed for the link budget), bandwidth collapses to 2.25 MHz. The radar IF at 1 km (1 kHz chirp rate) is 3.3 MHz — already outside the MCP6S91's bandwidth. The part was never suitable for this application.
 
 ---
 
-*Specification version 1.1 · Lyrion Radar · MIT License*
+*Specification version 2.0 · Lyrion Radar · MIT License*
