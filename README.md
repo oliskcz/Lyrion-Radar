@@ -57,7 +57,7 @@ The design is built around a **phase-locked loop** (not an open-loop DAC) for ch
 | **Chirp source** | ADF41510 fractional-N PLL (built-in ramp gen) |
 | **Phase noise** | −231 dBc/Hz @ 100 kHz (fractional-N) |
 | **ADC** | AD9643 dual 14-bit, 250 MSPS (LVDS) |
-| **DSP** | Xilinx XC7A100T Artix-7 FPGA |
+| **DSP** | Xilinx XC7A100T-2FTG256I Artix-7 FPGA |
 | **TX power** | +11.4 dBm (prototype 1) |
 | **Antenna gain** | 24 dBi each (TX and RX, separate) |
 | **EIRP** | +35.4 dBm (3.5 W ERP) |
@@ -93,8 +93,8 @@ flowchart LR
 
     %% Digital
     ADC[/"AD9643<br/>250 MSPS"\]
-    FPGA["XC7A100T<br/>FPGA"]
-    MCU["STM32H503<br/>MCU"]
+    FPGA["XC7A100T-2FTG256I<br/>FPGA"]
+    MCU["STM32H503CBU6<br/>MCU"]
     PC(["PC"])
 
     %% Chirp Source flow
@@ -128,7 +128,7 @@ flowchart LR
 | Trapezoid | Antenna, filter, pad | TX Ant, RX Ant, 6 dB pad |
 | Flag/triangle | Amplifier | YG802020W PA, QPL9547 LNA, OPA838, MCP6S91 |
 | Circle | Mixer, divider, VCO, reference | YX18 mixer, GP2X+ divider, VCO, TCXO |
-| Stadium | PLL, FPGA, MCU, PC | ADF41510, XC7A100T, STM32H503, PC display |
+| Stadium | PLL, FPGA, MCU, PC | ADF41510, XC7A100T-2FTG256I, STM32H503CBU6, PC display |
 | Diamond | Filter | Loop filter |
 | Parallelogram | ADC | AD9643 |
 
@@ -139,7 +139,7 @@ flowchart LR
 | **Chirp Source** | Generates a linear 5.5–6 GHz chirp | ADF41510 PLL, YSGM556006 VCO, 100 MHz TCXO, loop filter |
 | **TX Chain** | Amplifies and transmits the chirp | YG802020W PA (+15 dB), GP2X+ divider, 24 dBi antenna |
 | **RX Chain** | Receives, amplifies, and downconverts echoes | QPL9547 LNA, YX18 mixer, OPA838 IF amp, MCP6S91 AGC, 24 dBi antenna |
-| **Digital Processing** | Digitises and processes the IF signal | AD9643 ADC, XC7A100T FPGA, STM32H503 MCU |
+| **Digital Processing** | Digitises and processes the IF signal | AD9643 ADC, XC7A100T-2FTG256I FPGA, STM32H503CBU6 MCU |
 
 ### Signal flow
 
@@ -208,11 +208,11 @@ An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
 | **AD9643BCPZ-250** | ADI | ADC | Dual 14-bit, 250 MSPS, LVDS |
-| **XC7A100T-CSG324** | Xilinx | FPGA | Artix-7, 101K logic cells, 240 DSP slices |
+| **XC7A100T-2FTG256I** | Xilinx | FPGA | Artix-7, 101K logic cells, 240 DSP slices, 256-ball BGA, speed grade -2, industrial temp |
 | **MT41K256M16TW-107** | Micron | DDR3L SDRAM | 256M × 16 = 512 MB |
-| **STM32H503** | ST | Housekeeping MCU | Cortex-M33 @ 250 MHz, 128 KB SRAM, USB |
+| **STM32H503CBU6** | ST | Housekeeping MCU | Cortex-M33 @ 250 MHz, LQFP-48, USB |
 
-> The **STM32H503** is the right fit for housekeeping: faster and more capable than the STM32G071, but not overkill like the STM32H723. It handles SPI to the PLL, SPI to the AGC, I²C to the temp sensor, GPIO to the FPGA, and USB for debugging.
+> The **STM32H503CBU6** is the right fit for housekeeping: faster and more capable than the STM32G071, but not overkill like the STM32H723. It handles SPI to the PLL, SPI to the AGC, I²C to the temp sensor, GPIO to the FPGA, and USB for debugging. The LQFP-48 package is easy to hand-solder.
 
 ### Power
 
@@ -251,7 +251,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     RXANT[/"RX Antenna<br/>-107 to -159 dBm"/] --> LNA>"QPL9547<br/>+10 dB"] --> MIX(("YX18<br/>Mixer"))
-    MIX --> IFA>"OPA838<br/>×10"] --> AGC>"MCP6S91<br/>AGC 0-30 dB"] --> ADC[/"AD9643<br/>250 MSPS"\] --> FPGA["XC7A100T<br/>FPGA"] --> PC(["PC"])
+    MIX --> IFA>"OPA838<br/>×10"] --> AGC>"MCP6S91<br/>AGC 0-30 dB"] --> ADC[/"AD9643<br/>250 MSPS"\] --> FPGA["XC7A100T-2FTG256I<br/>FPGA"] --> PC(["PC"])
 
     LO_in(("LO")) -.-> MIX
 ```
@@ -365,9 +365,9 @@ For serious drone detection, you need phase coherence, micro-Doppler processing,
 
 The open-loop DAC approach was simpler but had critical limitations: VCO phase noise masks small targets, chirp coherence was unproven, and temperature drift needed active compensation. The ADF41510 solves all of these with a built-in ramp generator, ultra-low phase noise, and PLL locking to a stable TCXO reference.
 
-### 2. XC7A100T FPGA (not MCU)
+### 2. XC7A100T-2FTG256I FPGA (not MCU)
 
-A microcontroller can do basic range FFT in ~50 µs, but cannot do real-time coherent integration, micro-Doppler, or 2D range-Doppler processing. The XC7A100T runs FFTs in < 1 µs in hardware, with deterministic latency.
+A microcontroller can do basic range FFT in ~50 µs, but cannot do real-time coherent integration, micro-Doppler, or 2D range-Doppler processing. The XC7A100T-2FTG256I runs FFTs in < 1 µs in hardware, with deterministic latency.
 
 ### 3. AD9643 at 250 MSPS (not slower)
 
@@ -377,7 +377,7 @@ A microcontroller can do basic range FFT in ~50 µs, but cannot do real-time coh
 
 The VCO you already own is reused as the VCO in the PLL loop. The ADF41510 doesn't have an integrated VCO, so this is a natural fit.
 
-### 5. STM32H503 for housekeeping (not G071, not H723)
+### 5. STM32H503CBU6 for housekeeping (not G071, not H723)
 
 The G071 would technically work for housekeeping, but the H503 gives more headroom for future features at low cost. The H723 is overkill — those are reserved for other projects.
 
@@ -402,7 +402,7 @@ The YG802020W delivers +15 dBm, which combined with 24 dBi antennas and coherent
 | Hardware bring-up (PLL + TX/RX) | ⬜ Pending |
 | VCO/PLL calibration | ⬜ Pending |
 | FPGA firmware (VHDL/Verilog) | ⬜ Pending |
-| MCU firmware (STM32H503) | ⬜ Pending |
+| MCU firmware (STM32H503CBU6) | ⬜ Pending |
 | ADC interface (LVDS) | ⬜ Pending |
 | DSP pipeline (DDC → FFT → CFAR) | ⬜ Pending |
 | Integration + drone flight test | ⬜ Pending |

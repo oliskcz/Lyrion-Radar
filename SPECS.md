@@ -1,7 +1,7 @@
 # Lyrion Radar — Front-End Specifications
 
 > **System**: FMCW radar at 5.5–6 GHz for counter-UAS (drone detection)
-> **Architecture**: ADF41510 PLL chirp → YSGM556006 VCO → TX/RX analog → AD9643 ADC → XC7A100T FPGA DSP
+> **Architecture**: ADF41510 PLL chirp → YSGM556006 VCO → TX/RX analog → AD9643 ADC → XC7A100T-2FTG256I FPGA DSP
 
 ---
 
@@ -151,14 +151,14 @@ Fabric bus:     7 pairs × 8 bits = 56 bits per channel @ 62.5 MHz
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| **FPGA** | **Xilinx XC7A100T** | Artix-7, 324-pin BGA |
+| **FPGA** | **Xilinx XC7A100T-2FTG256I** | Artix-7, 256-ball FTG BGA, speed grade -2, industrial temp |
 | Logic cells | 101,440 | |
 | DSP slices | 240 | |
 | BRAM | 4,860 Kb | 607.5 KB |
-| DDR3 SDRAM | 512 MB (MT41K256M16) | For FFT buffers, data logging |
-| **MCU** | **STM32H503** | Cortex-M33 @ 250 MHz |
-| MCU SRAM | 128 KB | |
-| MCU flash | 256 KB | |
+| DDR3 SDRAM | 512 MB (MT41K256M16) | **Required for large FFTs (>8K points)** |
+| **MCU** | **STM32H503CBU6** | Cortex-M33 @ 250 MHz, LQFP-48 |
+| MCU SRAM | 64 KB | (some variants 128 KB) |
+| MCU flash | 128–256 KB | (variant dependent) |
 | MCU peripherals | SPI (3×), I²C (2×), UART, USB | PLL, AGC, temp, debug |
 
 ### FPGA DSP Pipeline (Estimated Resources)

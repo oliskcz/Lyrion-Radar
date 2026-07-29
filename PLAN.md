@@ -2,7 +2,7 @@
 
 ## Goal
 
-Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. PLL-based chirp source (ADF41510 + YSGM556006 VCO), diode-ring mixer RX, dual 14-bit 250 MSPS ADC (AD9643), Xilinx Artix-7 XC7A100T FPGA for DSP, STM32H503 housekeeping MCU.
+Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. PLL-based chirp source (ADF41510 + YSGM556006 VCO), diode-ring mixer RX, dual 14-bit 250 MSPS ADC (AD9643), Xilinx Artix-7 XC7A100T-2FTG256I FPGA for DSP, STM32H503CBU6 housekeeping MCU.
 
 **Realistic prototype 1 targets:**
 - ~2 km for small drones (σ = 0.01 m²) — with 64-chirp coherent integration
@@ -40,8 +40,8 @@ flowchart LR
 
     %% Digital
     ADC[/"AD9643<br/>250 MSPS"\]
-    FPGA["XC7A100T<br/>FPGA"]
-    MCU["STM32H503<br/>MCU"]
+    FPGA["XC7A100T-2FTG256I<br/>FPGA"]
+    MCU["STM32H503CBU6<br/>MCU"]
     PC(["PC"])
 
     %% Chirp Source flow
@@ -75,7 +75,7 @@ flowchart LR
 | Trapezoid | Antenna, filter, pad | TX Ant, RX Ant, 6 dB pad |
 | Flag/triangle | Amplifier | YG802020W PA, QPL9547 LNA, OPA838, MCP6S91 |
 | Circle | Mixer, divider, VCO, reference | YX18 mixer, GP2X+ divider, VCO, TCXO |
-| Stadium | PLL, FPGA, MCU, PC | ADF41510, XC7A100T, STM32H503, PC display |
+| Stadium | PLL, FPGA, MCU, PC | ADF41510, XC7A100T-2FTG256I, STM32H503CBU6, PC display |
 | Diamond | Filter | Loop filter |
 | Parallelogram | ADC | AD9643 |
 
@@ -86,7 +86,7 @@ flowchart LR
 | **Chirp Source** | Generates a linear 5.5–6 GHz chirp | ADF41510 PLL, YSGM556006 VCO, 100 MHz TCXO, loop filter |
 | **TX Chain** | Amplifies and transmits the chirp | YG802020W PA (+15 dB), GP2X+ divider, 24 dBi antenna |
 | **RX Chain** | Receives, amplifies, and downconverts echoes | QPL9547 LNA, YX18 mixer, OPA838 IF amp, MCP6S91 AGC, 24 dBi antenna |
-| **Digital Processing** | Digitises and processes the IF signal | AD9643 ADC, XC7A100T FPGA, STM32H503 MCU |
+| **Digital Processing** | Digitises and processes the IF signal | AD9643 ADC, XC7A100T-2FTG256I FPGA, STM32H503CBU6 MCU |
 
 ### Signal flow
 
@@ -116,9 +116,9 @@ flowchart LR
 | 11 | **OPA838IDBVR** (TI) | IF preamplifier | 1 | 0.9 nV/√Hz, 300 MHz GBW |
 | 12 | **MCP6S91T-E/MS** (Microchip) | AGC (PGA) | 1 | 1×–32× (0–30 dB), 18 MHz GBW, SPI |
 | 13 | **AD9643BCPZ-250** (ADI) | ADC | 1 | Dual 14-bit, 250 MSPS, LVDS, QFN-48 |
-| 14 | **XC7A100T-CSG324** (Xilinx) | FPGA | 1 | Artix-7, 101K logic cells, 240 DSP slices |
+| 14 | **XC7A100T-2FTG256I** (Xilinx) | FPGA | 1 | Artix-7, 101K logic cells, 240 DSP slices, 256-ball BGA, speed grade -2, industrial temp |
 | 15 | **MT41K256M16TW-107** (Micron) | DDR3L SDRAM | 1 | 256M × 16 = 512 MB |
-| 16 | **STM32H503** (ST) | Housekeeping MCU | 1 | Cortex-M33 @ 250 MHz, 128 KB SRAM, USB |
+| 16 | **STM32H503CBU6** (ST) | Housekeeping MCU | 1 | Cortex-M33 @ 250 MHz, LQFP-48, USB |
 | 17 | **ADP150AUJZ-5.0** (ADI) | Ultra-low noise LDO | 1 | 5 V for VCO |
 | 18 | **LTM4644** (ADI) | FPGA power module | 1 | Multi-rail DC/DC (1.0/1.8/3.3 V) |
 | 19 | **LD1117S33** | 3.3 V LDO | 1 | MCU, ADC digital |
@@ -156,7 +156,7 @@ Power levels: VCO +6 dBm → pad 0 dBm → PA +15 dBm → divider +11.4 dBm per 
 ```mermaid
 flowchart LR
     RXANT[/"RX Antenna<br/>-107 to -159 dBm"/] --> LNA>"QPL9547<br/>+10 dB"] --> MIX(("YX18<br/>Mixer"))
-    MIX --> IFA>"OPA838<br/>×10"] --> AGC>"MCP6S91<br/>AGC 0-30 dB"] --> ADC[/"AD9643<br/>250 MSPS"\] --> FPGA["XC7A100T<br/>FPGA"] --> PC(["PC"])
+    MIX --> IFA>"OPA838<br/>×10"] --> AGC>"MCP6S91<br/>AGC 0-30 dB"] --> ADC[/"AD9643<br/>250 MSPS"\] --> FPGA["XC7A100T-2FTG256I<br/>FPGA"] --> PC(["PC"])
 
     LO_in(("LO")) -.-> MIX
 ```
@@ -242,7 +242,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
     │
   AD9643BCPZ-250 ch A (14-bit, 250 MSPS, LVDS)
     │
-  XC7A100T ISERDES → DDC → decimate → window → FFT → 2D FFT → MTI → CFAR
+  XC7A100T-2FTG256I ISERDES → DDC → decimate → window → FFT → 2D FFT → MTI → CFAR
     │
   USB/UART output (detected targets, range-Doppler maps)
 ```
@@ -255,7 +255,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
                           │   (fractional-N PLL)    │
   TCXO 100 MHz ──────────►│  REF_IN                  │
                           │                         │
-  STM32H503 SPI ────────►│  LE, CLK, DATA          │
+  STM32H503CBU6 SPI ────►│  LE, CLK, DATA          │
   (ramp parameters)       │  (ramp start, stop,     │
                           │   step, time, mode)     │
                           │                         │
@@ -280,17 +280,17 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
 | Function | Component | Notes |
 |----------|-----------|-------|
 | Chirp generation | **ADF41510** built-in ramp gen | Sawtooth or triangular, configurable |
-| ADF41510 config | **STM32H503** SPI | Ramp parameters, mode selection |
-| AGC control (MCP6S91) | **STM32H503** SPI | One SPI write per chirp |
-| Temperature monitoring | **STM32H503** I2C → TMP102 | Optional (PLL eliminates drift) |
-| ADC interface | **XC7A100T** ISERDES (LVDS) | 14-bit @ 250 MSPS, DDR |
-| DDC + decimation | **XC7A100T** CORDIC + CIC + FIR | 250 MSPS → 3.9 MSPS |
-| Range FFT | **XC7A100T** Xilinx FFT IP | 1024-pt, < 1 µs latency |
-| Doppler FFT (2D) | **XC7A100T** | 64-pt across chirps |
-| MTI, CFAR, detection | **XC7A100T** | Hardware, deterministic |
-| Micro-Doppler | **XC7A100T** | High-PRF mode (10 kHz) |
-| Tracking, output | **XC7A100T** | Kalman filter, USB/UART |
-| Debug / config | **STM32H503** UART | Mode switching, ADF41510 reconfig |
+| ADF41510 config | **STM32H503CBU6** SPI | Ramp parameters, mode selection |
+| AGC control (MCP6S91) | **STM32H503CBU6** SPI | One SPI write per chirp |
+| Temperature monitoring | **STM32H503CBU6** I2C → TMP102 | Optional (PLL eliminates drift) |
+| ADC interface | **XC7A100T-2FTG256I** ISERDES (LVDS) | 14-bit @ 250 MSPS, DDR |
+| DDC + decimation | **XC7A100T-2FTG256I** CORDIC + CIC + FIR | 250 MSPS → 3.9 MSPS |
+| Range FFT | **XC7A100T-2FTG256I** Xilinx FFT IP | 1024-pt, < 1 µs latency |
+| Doppler FFT (2D) | **XC7A100T-2FTG256I** | 64-pt across chirps |
+| MTI, CFAR, detection | **XC7A100T-2FTG256I** | Hardware, deterministic |
+| Micro-Doppler | **XC7A100T-2FTG256I** | High-PRF mode (10 kHz) |
+| Tracking, output | **XC7A100T-2FTG256I** | Kalman filter, USB/UART |
+| Debug / config | **STM32H503CBU6** UART | Mode switching, ADF41510 reconfig |
 
 ---
 
@@ -337,7 +337,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
                 └─────────────────────────────────────────────────────────────┘
 ```
 
-### FPGA Resource Estimate (XC7A100T)
+### FPGA Resource Estimate (XC7A100T-2FTG256I)
 
 | Block | LUTs | DSP48 | BRAM (KB) |
 |-------|------|-------|-----------|
@@ -351,7 +351,7 @@ RX antenna (24 dBi) — target echoes: −107 to −159 dBm
 | Tracking | 1,000 | 4 | 8 |
 | **Total** | **~12,500 (20%)** | **~76 (32%)** | **~132 (3% of 4,860 KB)** |
 
-The XC7A100T easily handles two channels (I/Q) simultaneously.
+The XC7A100T-2FTG256I easily handles two channels (I/Q) simultaneously.
 
 ---
 
@@ -402,7 +402,7 @@ The ADF41510's ramp generator produces:
 - **Sawtooth**: f_start → f_stop over T_ramp, then snap back to f_start
 - **Triangular**: f_start → f_stop → f_start, each over T_ramp/2
 
-STM32H503 configures the ramp via SPI:
+STM32H503CBU6 configures the ramp via SPI:
 - Start frequency (e.g., 5.5 GHz)
 - Stop frequency (e.g., 6.0 GHz)
 - Step size (e.g., 100 kHz for 5000 steps over 500 MHz)
@@ -464,9 +464,9 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 
 1. **ADF41510 PLL (not open-loop DAC)** — built-in ramp generator, ultra-low phase noise, true chirp-to-chirp coherence. Replaces DAC8830 + REF5050A + TLV9062.
 2. **YSGM556006 as PLL VCO** — reused from existing stock. Becomes the VCO in the PLL loop.
-3. **XC7A100T FPGA** — all real-time DSP. Replaces the MCU approach. Enables coherent integration (+18 dB), micro-Doppler, 2D range-Doppler.
+3. **XC7A100T-2FTG256I FPGA** — all real-time DSP. Replaces the MCU approach. Enables coherent integration (+18 dB), micro-Doppler, 2D range-Doppler.
 4. **AD9643 at 250 MSPS** — dual 14-bit LVDS. Ch A for IF, Ch B for future I/Q.
-5. **STM32H503 housekeeping MCU** — ADF41510 config, MCP6S91 AGC, TMP102 temp monitoring, USB. Modern Cortex-M33 at 250 MHz.
+5. **STM32H503CBU6 housekeeping MCU** — ADF41510 config, MCP6S91 AGC, TMP102 temp monitoring, USB. Modern Cortex-M33 at 250 MHz, LQFP-48 (hand-solderable).
 6. **TCXO 100 MHz reference** — PLL reference. Low phase noise, ±1 ppm.
 7. **Open-loop DAC ramp removed** — PLL generates the ramp. No more LUT pre-distortion, no more temperature compensation needed.
 8. **Single YG802020W before GP2X+ divider** — P1dB ~+16 dBm at 5.5 GHz, output +15 dBm.
@@ -526,12 +526,12 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - [ ] Build YX18 mixer with 2× NCS4-63+ baluns
 - [ ] Solder RC LPF (1 kΩ + 33 pF, fc ≈ 4.8 MHz)
 - [ ] Solder OPA838 (G=×10)
-- [ ] Solder MCP6S91 (SPI from STM32H503)
+- [ ] Solder MCP6S91 (SPI from STM32H503CBU6)
 - [ ] Verify mixer conversion loss with two signal generators
 
 ### Phase 5: FPGA Firmware (VHDL/Verilog in Vivado)
 
-- [ ] Vivado project for XC7A100T-CSG324
+- [ ] Vivado project for XC7A100T-2FTG256I
 - [ ] Clock generation: 250 MHz ADC clock, 100 MHz fabric clock, 200 MHz DDR clock
 - [ ] ISERDES: 14-bit LVDS deserialization from AD9643
 - [ ] AD9643 SPI config (sample rate, output format, channel select)
@@ -548,9 +548,9 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - [ ] Tracking: Kalman filter across frames
 - [ ] UART output: detected targets with range, velocity, amplitude
 
-### Phase 6: MCU Firmware (STM32H503)
+### Phase 6: MCU Firmware (STM32H503CBU6)
 
-- [ ] CubeMX project for STM32H503
+- [ ] CubeMX project for STM32H503CBU6
 - [ ] SPI1 → ADF41510 (ramp configuration, RAMP_START trigger)
 - [ ] SPI2 → MCP6S91 (AGC gain control)
 - [ ] I2C1 → TMP102 (temperature monitoring)
@@ -579,7 +579,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - **Loop filter**: close to ADF41510 charge pump output, short traces
 - **YSGM556006 VCO**: close to loop filter output, short VT trace (parasitic capacitance degrades loop phase margin)
 - **TCXO reference**: clean supply, short trace to ADF41510 REF_IN
-- **SPI**: short traces to STM32H503, with proper grounding
+- **SPI**: short traces to STM32H503CBU6, with proper grounding
 
 ### ADC (AD9643) to FPGA Interface
 
@@ -590,7 +590,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 - **Reference plane**: solid ground under all LVDS traces
 - **ADC clock**: clean 250 MHz from FPGA MMCM
 
-### FPGA (XC7A100T-CSG324) BGA Layout
+### FPGA (XC7A100T-2FTG256I) BGA Layout
 
 - **BGA pitch**: 0.8 mm, 324 balls
 - **Fanout**: dog-bone or via-in-pad
@@ -609,7 +609,7 @@ Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB, noise floor = −143 dB
 ### Development Board Option (Digilent Arty A7-100T)
 
 The Arty A7-100T dev board includes:
-- XC7A100T-CSG324
+- XC7A100T-2FTG256I
 - 256 MB DDR3L (MT41K256M16TW-107)
 - USB-UART bridge
 - 4 PMOD connectors (for ADC interface board)
