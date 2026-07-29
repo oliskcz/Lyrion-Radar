@@ -10,7 +10,7 @@
   <a href="#what-is-it"><img alt="Status" src="https://img.shields.io/badge/Status-Planning-yellow"></a>
   <a href="#components"><img alt="Components" src="https://img.shields.io/badge/Components-10+-blue"></a>
   <a href="#link-budget"><img alt="Range" src="https://img.shields.io/badge/Range-2%E2%80%933%20km-success"></a>
-  <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-TBD-lightgrey"></a>
+  <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green"></a>
 </p>
 
 ---
@@ -424,4 +424,6 @@ The YG802020W delivers +15 dBm, which combined with 24 dBi antennas and coherent
 
 ## License
 
-TBD
+MIT License — see [LICENSE](LICENSE) for details.
+
+Copyright (c) 2026 Oliver Zoller
