@@ -2,7 +2,15 @@
 
 ## Goal
 
-Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. Open-loop DAC-ramped VCO, diode-ring mixer RX, external 14-bit ADC, STM32H723-based signal processing. Target: **1–3 km detection of drones** (σ = 0.01–0.1 m²) with ~30 cm range resolution using **24 dBi antennas**.
+Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone detection (counter-UAS)**. Open-loop DAC-ramped VCO, diode-ring mixer RX, external 14-bit ADC, STM32H723-based signal processing.
+
+**Realistic prototype 1 targets:**
+- ~500 m to 1 km for small drones (σ = 0.01 m²)
+- ~1–1.5 km for medium drones (σ = 0.1 m²)
+- ~30 cm range resolution using 24 dBi antennas
+- Scan rate 5–100 Hz depending on mode
+
+**Path to 2–3 km range:** Requires real PA upgrade (MMG3H21NT1, +27 dBm TX), proven coherent integration (or PLL), and chirp rate that supports micro-Doppler.
 
 ### Drone RCS Reference
 
@@ -13,10 +21,12 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 | Medium (2–25 kg) | DJI Matrice 300 | 0.05–0.1 m² | −13 to −10 dBsm |
 | Large (> 25 kg) | Fixed-wing UAV | 0.1–1 m² | −10 to 0 dBsm |
 
-**Prototype 1**: Single IF channel (one mixer, one IF chain, ADC channel A). Channel B reserved for future I/Q or second RX antenna. Triangular ramp extracts range + velocity (critical for distinguishing drones from birds/clutter).
+**Prototype 1**: Single IF channel (one mixer, one IF chain, ADC channel A). Channel B reserved for future I/Q or second RX antenna. Triangular ramp extracts range + velocity.
 **Future rev**: Dual-channel I/Q (90° hybrid + second mixer) for better clutter rejection and MTI, more powerful PA (MMG3H21NT1 or HMC637), optionally Xilinx Artix-7 35T FPGA for hardware DDC/FFT.
 
-## Confirmed BOM
+---
+
+## Confirmed BOM (Corrected)
 
 | # | Part Number | Role | Qty | Key Specs |
 |---|-------------|------|-----|-----------|
@@ -25,18 +35,18 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 | 3 | **REF5050AIDGKR** (TI) | DAC voltage reference | 1 | 5.0 V, 3 ppm/°C, needs >5.3 V input (12 V rail available) |
 | 4 | **TLV9062IDR** (TI) | DAC output buffer | 1 | Dual op-amp, rail-to-rail, 10 MHz GBW, SOIC-8. Ch A = DAC buffer, Ch B = spare |
 | 5 | **TMP102AIDRLR** (TI) | Temperature sensor | 1 | I²C, ±0.5 °C, SOT-563 |
-| 6 | **YG802020W** (Innotion) | TX driver amplifier | 1 | 50 MHz–8 GHz, +15 dB gain @ 5.5 GHz (93 mA), **P1dB ~+16 dBm @ 5.5 GHz**, DFN 2×2 |
+| 6 | **YG802020W** (Innotion) | TX driver amplifier | 1 | 50 MHz–8 GHz, +15 dB gain @ 5.5 GHz (93 mA), P1dB ~+16 dBm @ 5.5 GHz, DFN 2×2 |
 | 7 | **GP2X+** (Mini-Circuits) | 2-way power divider | 1 | 2.9–6.2 GHz, 3.6 dB total loss, 19–21 dB isolation, 3×3 mm QFN |
-| 8 | **QPL9547TR7** (Qorvo) | RX LNA | 1 | 0.05–6 GHz, 0.6 dB NF, 17 dB gain, +19 dBm P1dB, DFN 2×2 |
+| 8 | **QPL9547TR7** (Qorvo) | RX LNA | 1 | 0.05–6 GHz. **At 5.75 GHz: ~1 dB NF, ~10 dB gain** (datasheet headline 0.6 dB / 17 dB is mid-band ~2 GHz — **verify on VNA/NF meter**), +19 dBm P1dB, DFN 2×2 |
 | 9 | **YX18** (Innotion) | Mixer diode quad | 1 | GaAs Schottky cross-over quad, 1.4 V turn-on, DFN 2×2 |
 | 10 | **NCS4-63+** (Mini-Circuits) | Mixer baluns | 2 | 4.5–6 GHz, 1:4 ratio, 0.5 dB amplitude unbalance, 0805 |
 | 11 | **OPA838IDBVR** (TI) | IF preamplifier | 1 | 0.9 nV/√Hz, **300 MHz GBW**, 1 mA supply, SOT-23-5 |
 | 12 | **MCP6S91T-E/MS** (Microchip) | IF PGA (AGC) | 1 | 1×–32× (0–30 dB), 18 MHz GBW, SPI, MSOP-8 |
 | 13 | **ADC3642IRSBR** (TI) | External ADC | 1 | Dual 14-bit, 25 MSPS, ultra-low power, QFN-40. Ch A = IF, Ch B = future I/Q |
-| 14 | **STM32H723VGT6** (ST) | MCU / signal processor | 1 | Cortex-M7 @ 550 MHz, HW FPU, 320 KB SRAM, DCMI, LQFP-100 |
+| 14 | **STM32H723VGT6** (ST) | MCU / signal processor | 1 | Cortex-M7 @ 550 MHz, HW FPU, **564 KB SRAM**, DCMI, LQFP-100 |
 | 15 | **ADP150AUJZ-5.0** (ADI) | Ultra-low noise LDO | 2 | 5 V out, <10 µVrms noise. One for VCO VCC, one for analog/RF |
 | 16 | **LD1117S33** or similar | 3.3 V LDO for digital | 1 | STM32H723, ADC3642 digital supply |
-| 17 | Resistors: 68 Ω, 150 Ω ×2 | 6 dB resistive pad | 3 | 0603 thin-film, after VCO output |
+| 17 | Resistors: **150 Ω, 37.4 Ω, 150 Ω** | 6 dB resistive **π-pad** (corrected) | 3 | 0603 thin-film, after VCO output |
 | 18 | Resistors: 1 kΩ, 9.09 kΩ | OPA838 gain setting (×10) | 2 | 0603, E96 values |
 | 19 | Caps: 100 nF ×6, 10 µF ×2, 33 pF ×1, 10 nF ×2, 1000 pF ×2, 1 pF ×2 | Bypass, DC block, LPF, matching | ~15 | 0603/0805 |
 | 20 | Inductors: 68 nH ×2, 2.2 nH ×1 | YG802020W bias feed, matching | 3 | 0603 |
@@ -44,6 +54,8 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 | 22 | Antennas: **24 dBi** ×2 | TX and RX (separate) | 2 | 5.5–6 GHz, ~5° beamwidth, patch array or dish |
 
 **Total active component cost: ~$40** (excluding antennas, PCB, VCOs/diodes/baluns already owned)
+
+---
 
 ## Signal Chain
 
@@ -54,25 +66,25 @@ YSGM556006 VCO (+6 dBm)
     │
   100 nF DC block
     │
-  6 dB resistive pad (68Ω series + 2×150Ω shunt) → 0 dBm
+  6 dB π-pad (150 Ω / 37.4 Ω / 150 Ω) → 0 dBm
     │
   YG802020W (G=+15 dB @ 93 mA, Rex=open) → +15 dBm
     │
   GP2X+ divider (−3.6 dB) → +11.4 dBm per port
     │
-    ├── Port 1 → TX antenna (24 dBi) → +35.4 dBm EIRP
+    ├── Port 1 → TX antenna (24 dBi) → +35.4 dBm EIRP (3.5 W ERP)
     │
     └── Port 2 → NCS4-63+ balun → YX18 mixer LO port
 ```
 
-**Note:** YG802020W P1dB is ~+16 dBm at 5.5 GHz. Output of +15 dBm is 1 dB below compression — acceptable. Future: add MMG3H21NT1 PA (+30 dBm P1dB) for +27 dBm TX.
+**Note:** YG802020W P1dB is ~+16 dBm at 5.5 GHz. Output of +15 dBm is 1 dB below compression — acceptable. **Regulatory:** +35.4 dBm EIRP at 5.5–6 GHz is not ISM — requires licensed or experimental authorization in most jurisdictions.
 
 ### RX Path
 
 ```
-RX antenna (24 dBi)
+RX antenna (24 dBi) — target echoes: −107 to −159 dBm depending on range/RCS
     │
-  QPL9547TR7 LNA (G=+17 dB, NF=0.6 dB)
+  QPL9547TR7 LNA (G=~10 dB, NF=~1 dB at 5.75 GHz — verify)
     │
   NCS4-63+ balun (RF port, −0.5 dB)
     │
@@ -86,17 +98,19 @@ RX antenna (24 dBi)
     │
   ADC3642IRSBR ch A (14-bit, 25 MSPS, parallel CMOS → DCMI)
     │
-  STM32H723 (DMA capture → decimate → FFT → detection)
+  STM32H723 (DMA capture → on-the-fly decimate → FFT → detection)
 ```
 
 ### IF Gain/Bandwidth at AGC Settings
 
-| MCP6S91 gain | MCP6S91 BW | Combined BW (with OPA838 ×10) | Total gain | Use case |
-|-------------|-----------|-------------------------------|------------|----------|
-| ×1 (0 dB) | 18 MHz | 7.2 MHz | 20 dB | Close targets, strong signal |
-| ×4 (12 dB) | 4.5 MHz | 3.6 MHz | 32 dB | Medium range, short ramps |
-| ×8 (18 dB) | 2.25 MHz | 2.2 MHz | 38 dB | 1 km, 5 ms ramp |
-| ×32 (30 dB) | 562 kHz | 558 kHz | 50 dB | 3 km, 10 ms ramp (f_IF=100 kHz) |
+| MCP6S91 gain | MCP6S91 BW | Combined BW (with OPA838 ×10) | Total gain | Max usable IF | Use case |
+|-------------|-----------|-------------------------------|------------|---------------|----------|
+| ×1 (0 dB) | 18 MHz | 7.2 MHz | 20 dB | 7.2 MHz | Close targets, strong signal |
+| ×4 (12 dB) | 4.5 MHz | 3.6 MHz | 32 dB | 3.6 MHz | 100–500 m, 1 ms ramp |
+| ×8 (18 dB) | 2.25 MHz | 2.2 MHz | 38 dB | 2.2 MHz | 1 km, 1 ms ramp |
+| ×32 (30 dB) | 562 kHz | 558 kHz | 50 dB | **558 kHz** | **1.5 km, 5 ms ramp (f_IF=1 MHz — outside BW!)** |
+
+**Critical:** The ×32 AGC setting cannot pass the IF for targets beyond ~1.5 km with 5 ms ramp. This is a hard bandwidth limit. Reduce AGC gain for long-range detection.
 
 ### Control / Support
 
@@ -116,6 +130,8 @@ ADP150-5.0 #2 ──→ TLV9062, OPA838, QPL9547, YG802020W VCC
 LD1117-3.3 ──→ STM32H723 VDD, ADC3642 digital supply
 ```
 
+---
+
 ## Power Budgets
 
 ### TX Power Budget
@@ -123,98 +139,120 @@ LD1117-3.3 ──→ STM32H723 VDD, ADC3642 digital supply
 | Stage | Input | Gain/Loss | Output |
 |-------|-------|-----------|--------|
 | VCO | — | — | +6 dBm |
-| 6 dB pad | +6 dBm | −6 dB | 0 dBm |
+| 6 dB π-pad (150/37.4/150) | +6 dBm | −6 dB | 0 dBm |
 | YG802020W | 0 dBm | +15 dB | +15 dBm |
 | GP2X+ | +15 dBm | −3.6 dB | +11.4 dBm (each port) |
 
-TX EIRP with 24 dBi antenna: **+35.4 dBm** (~3.5 kW ERP).
+TX EIRP with 24 dBi antenna: **+35.4 dBm** = **3.5 W ERP** (not "kW" — corrected).
 
-### RX Link Budget — Drone Detection (Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 0.8 dB)
+### RX Link Budget — Drone Detection (Corrected)
 
-| Range | σ (m²) | Target | Pr (dBm) | SNR (single chirp) | SNR (64-chirp integration) | Detectable? |
-|-------|--------|--------|----------|--------------------|-----------------------------|-------------|
-| 500 m | 0.1 | Medium drone | −107.2 | 36 dB | 54 dB | ✅ |
-| 500 m | 0.01 | Small drone | −117.2 | 26 dB | 44 dB | ✅ |
-| 1 km | 0.1 | Medium drone | −127.2 | 16 dB | 34 dB | ✅ |
-| 1 km | 0.01 | Small drone | −137.2 | 6 dB | 24 dB | ✅ |
-| 2 km | 0.1 | Medium drone | −139.2 | 4 dB | 22 dB | ✅ (with integration) |
-| 2 km | 0.01 | Small drone | −149.2 | −6 dB | 12 dB | ⚠️ marginal |
-| 3 km | 0.1 | Medium drone | −148.7 | −5.5 dB | 12.5 dB | ⚠️ needs integration |
-| 3 km | 0.01 | Small drone | −158.7 | −15.5 dB | 2.5 dB | ❌ needs PA upgrade |
+Conditions: Pt = +11.4 dBm, Gt = Gr = 24 dBi, NF = 1 dB (QPL9547 at band edge), noise floor = −143 dBm (1 kHz bin).
 
-**Key insight:** Coherent integration (64 chirps, +18 dB) is **essential** for drone detection. Without it, small drones (σ=0.01 m²) are only detectable to ~1 km. With integration, 2 km is achievable.
+**Radar equation uses R⁴. From 1 km to 500 m you gain 12 dB, not 20 dB.**
 
-**For 3 km small drone detection:** Requires PA upgrade (+20 dBm TX → +8.6 dB improvement) + 64-chirp integration.
+| Range | σ (m²) | Target | Pr (dBm) | SNR (single chirp) | SNR (64-chirp noncoherent) | SNR (64-chirp coherent, if achievable) |
+|-------|--------|--------|----------|--------------------|----------------------------|--------------------------------------|
+| 500 m | 0.1 | Medium drone | −117.2 | 26 dB | 35 dB ✅ | 44 dB ✅ |
+| 500 m | 0.01 | Small drone | **−127.2** | **16 dB** | **25 dB** ✅ | **34 dB** ✅ |
+| 1 km | 0.1 | Medium drone | −129.2 | 14 dB | 23 dB ✅ | 32 dB ✅ |
+| 1 km | 0.01 | Small drone | **−139.2** | **4 dB** | **13 dB** ⚠️ | **22 dB** ✅ |
+| 1.5 km | 0.1 | Medium drone | −136.2 | 7 dB | 16 dB ✅ | 25 dB ✅ |
+| 1.5 km | 0.01 | Small drone | −146.2 | −3 dB | 6 dB ⚠️ | 15 dB ✅ |
+| 2 km | 0.1 | Medium drone | −141.2 | 2 dB | 11 dB ⚠️ | 20 dB ✅ |
+| 2 km | 0.01 | Small drone | −151.2 | −8 dB | 1 dB ❌ | 10 dB ⚠️ |
+| 3 km | 0.1 | Medium drone | −148.7 | −6 dB | 3 dB ❌ | 12 dB ⚠️ |
 
-Noise floor per 1 kHz bin: −174 + 30 + 0.8 = −143.2 dBm.
+**Key insight: coherent vs noncoherent matters enormously.**
 
-### FMCW Parameters
+- **Noncoherent** integration: gain ≈ 5·log₁₀(N) = +9 dB for N=64. **Realistic for open-loop VCO.**
+- **Coherent** integration: gain = 10·log₁₀(N) = +18 dB for N=64. **Requires chirp-to-chirp phase coherence** — unproven with this design.
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Center frequency | 5.75 GHz | |
-| Sweep bandwidth | 500 MHz (5.5–6.0 GHz) | VCO tuning: ~1.2 V → 4.6 V |
-| Range resolution | **30 cm** | ΔR = c / (2B) |
+**Honest target for prototype 1:** ~500 m to 1 km for small drones, ~1.5 km for medium drones — with the caveat that this assumes noncoherent integration. Achieving 2–3 km requires either (a) proven coherent integration with a stable VCO, or (b) a real PA (MMG3H21NT1, +27 dBm TX → +15.6 dB improvement).
 
-### Chirp Configurations
+---
 
-| Config | Ramp T | LPF fc | Max range | f_IF @ 3 km | Samples @ 25 MSPS | FFT | Update rate |
-|--------|--------|--------|-----------|-------------|-------------------|-----|-------------|
-| **Search (default)** | 10 ms | 194 kHz | 3 km | 100 kHz | 250,000 | 2048-pt | 100 Hz |
-| **Track** | 5 ms | 500 kHz | 3 km | 200 kHz | 125,000 | 1024-pt | 200 Hz |
-| **Fast** | 1 ms | 4.8 MHz | 600 m | 1 MHz | 25,000 | 256-pt | 1000 Hz |
+## Chirp Configurations (Corrected)
 
-**Search mode** (10 ms ramp): IF for 3 km target is only 100 kHz — within MCP6S91 ×32 bandwidth (562 kHz). Maximum sensitivity.
+### IF frequency as a function of range and ramp time
 
-**Memory management:** 250K samples at 14 bits = 500 KB — exceeds H723's 320 KB SRAM. Solution: **decimate on-the-fly** in DMA ISR (accumulate + dump every 125th sample) → only 2,000 samples stored per ramp.
+**f_IF = 2BR / (cT) — verify with this formula every time you change a parameter.**
+
+| Range | T=1 ms | T=5 ms | T=10 ms |
+|-------|--------|--------|---------|
+| 100 m | 333 kHz | 66.7 kHz | 33.3 kHz |
+| 500 m | 1.67 MHz | 333 kHz | 167 kHz |
+| 1 km | **3.33 MHz** | 667 kHz | 333 kHz |
+| 1.5 km | 5 MHz | **1 MHz** | 500 kHz |
+| 2 km | 6.67 MHz | 1.33 MHz | 667 kHz |
+| 3 km | 10 MHz | **2 MHz** | **1 MHz** |
+
+### Configurations
+
+| Mode | Ramp T | LPF fc | Max range | f_IF @ max range | Samples (25 MSPS) | FFT | Scan rate | Max velocity |
+|------|--------|--------|-----------|-------------------|-------------------|-----|-----------|-------------|
+| **Search** | 10 ms | 500 kHz | 1.5 km | 500 kHz | 250,000 → decimate to 5,000 | 4096-pt | **5–10 Hz** (after 64-chirp integration) | 0.625 m/s |
+| **Track** | 5 ms | 1 MHz | 1.5 km | 1 MHz | 125,000 → decimate to 2,500 | 2048-pt | 10–20 Hz | 1.25 m/s |
+| **Fast** | 1 ms | 5 MHz | 500 m | 1.67 MHz | 25,000 | 512-pt | 50–100 Hz | 6.25 m/s |
+
+**Important constraints:**
+
+- **Scan rate vs integration**: 64-chirp coherent integration at 10 ms ramp = 0.64 s per integrated frame → ~1.5 Hz. Noncoherent (no phase preservation) lets you trade integration for scan rate.
+- **Micro-Doppler vs long ramp**: Rotor modulation at 100–500 Hz needs chirp PRF ≳ 1 kHz. Search mode at 10 ms only gives 50–100 Hz PRF. **Micro-Doppler drone/bird discrimination is not feasible in Search or Track modes.**
+- **MCP6S91 bandwidth**: At ×32 (562 kHz BW), the IF for a 1.5 km target with 5 ms ramp is 1 MHz — **does not fit**. Reduce AGC gain or use 1.5 km max range.
+- **Memory**: 250K samples × 2 bytes = 500 KB. 564 KB SRAM total. **Decimate on-the-fly** in DMA ISR (accumulate + dump every Nth sample) → only 5,000 samples stored per ramp.
 
 ### Velocity (Doppler) with Triangular Ramp
 
-Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This overlap makes Doppler alone insufficient for drone/bird discrimination — micro-Doppler (rotor blade modulation) is the key differentiator.
+**v_max ≈ λ / (4T)** — commonly miscalculated:
 
-| Ramp T | Max unambiguous velocity | Velocity resolution (64 chirps) |
-|--------|-------------------------|-------------------------------|
-| 10 ms | 1.25 m/s | 0.02 m/s |
-| 5 ms | 2.5 m/s | 0.04 m/s |
-| 1 ms | 12.5 m/s | 0.2 m/s |
+| Ramp time | Max unambiguous velocity | Drones covered |
+|-----------|--------------------------|----------------|
+| 10 ms | **0.625 m/s** | Hovering only |
+| 5 ms | 1.25 m/s | Slow drift (< 4.5 km/h) |
+| 1 ms | 6.25 m/s | Hovering to 22 km/h |
 
-**For drone detection:** Use 5 ms ramp (v_max = 2.5 m/s per chirp pair, covers hovering and slow flight). For fast drones (20 m/s), use 1 ms ramp or unwrap across multiple chirp pairs.
+**Critical:** Small drones routinely fly 5–20 m/s. At 10 ms ramp, v_max = 0.625 m/s — a drone flying at 5 m/s will alias and appear as a false stationary or slow target. **Search mode at 10 ms is not usable for moving drones.** Use Fast mode (1 ms, 6.25 m/s) for detection, then track.
 
 ### Drone-Specific Signal Processing
 
-| Technique | Purpose | Implementation |
-|-----------|---------|----------------|
-| **Coherent integration** (64–256 chirps) | +18 to +24 dB SNR for small RCS | Stack N chirps, 2D FFT (range-Doppler map) |
-| **MTI (Moving Target Indication)** | Reject stationary clutter (buildings, ground) | Subtract consecutive range profiles or high-pass filter in Doppler |
-| **Micro-Doppler detection** | Distinguish drones from birds (rotor blade modulation at 100–500 Hz) | Longer CPI (coherent processing interval), spectrogram analysis |
-| **CFAR detection** | Adaptive threshold for varying clutter environments | Cell-averaging CFAR on range-Doppler map |
-| **Track-before-detect** | Detect sub-threshold targets by accumulating energy across scans | Multi-frame integration with motion compensation |
+| Technique | Purpose | Status |
+|-----------|---------|--------|
+| **Coherent integration** (64 chirps) | +18 dB SNR | **Unverified** with open-loop VCO. Noncoherent (~+9 dB) is the safe assumption. |
+| **MTI** | Reject stationary clutter | Implemented as range-Doppler subtraction |
+| **Micro-Doppler** (rotor blade at 100–500 Hz) | Drone vs. bird discrimination | **Not feasible in Search/Track modes** (PRF too low). Would need a separate high-PRF discriminator mode. |
+| **CFAR** | Adaptive detection in clutter | Cell-averaging CFAR on range-Doppler map |
+| **Velocity aliasing handling** | Drones fly 5–20 m/s | Detect aliases in the up/down chirp pair and unwrap |
+
+---
 
 ## Key Design Decisions
 
-1. **Open-loop DAC ramp with one-time SA calibration** — VCO frequency vs. tuning voltage measured on spectrum analyzer, stored as LUT in firmware. No PLL.
+1. **Open-loop DAC ramp with one-time SA calibration** — VCO frequency vs. tuning voltage measured on spectrum analyzer, stored as LUT in firmware. No PLL. **Coherence unproven — integration is likely noncoherent (~+9 dB for 64 chirps).**
 2. **Temperature compensation via TMP102** — LUT baseline shifted by measured ΔT × drift coefficient (~0.6 MHz/°C ≈ 262 DAC codes/°C at 16-bit).
-3. **6 dB resistive pad after VCO** — prevents 9 MHz pp pulling from load mismatch.
+3. **6 dB resistive π-pad after VCO (corrected values: 150/37.4/150 Ω)** — prevents 9 MHz pp pulling from load mismatch. Earlier 150/68/150 was wrong.
 4. **Single YG802020W before GP2X+ divider** — one amp drives both TX and LO paths. P1dB ~+16 dBm at 5.5 GHz, output +15 dBm (1 dB below compression). Future: add MMG3H21NT1 PA for +27 dBm.
 5. **GP2X+ divider** — guaranteed specs, 3×3 mm, no PCB RF design needed for the split.
-6. **QPL9547 as LNA** — 0.6 dB NF gives ~5 dB better sensitivity than YG802020W.
+6. **QPL9547 as LNA** — **At 5.75 GHz: ~1 dB NF, ~10 dB gain (verify).** Datasheet 0.6 dB / 17 dB is mid-band.
 7. **YX18 + 2× NCS4-63+ as mixer** — 1:4 balun provides voltage step-up to overcome 1.4 V diode turn-on at +11.4 dBm LO.
 8. **OPA838 ×10 fixed gain (300 MHz GBW)** — 20 dB gain, 30 MHz bandwidth. Not the bandwidth bottleneck. Resistors: R1=1 kΩ, R2=9.09 kΩ.
-9. **MCP6S91 SPI AGC (0–30 dB)** — adjusts gain between ramps. At ×32, BW=562 kHz — sufficient for 100 kHz IF at 3 km with 10 ms ramp. Future upgrade: AD603 VGA (90 MHz BW at all gains) if wide BW at high gain is needed.
+9. **MCP6S91 SPI AGC (0–30 dB)** — adjusts gain between ramps. **At ×32, BW=562 kHz — cannot pass IF > 558 kHz.** Reduces max range at high gain.
 10. **REF5050A from 12 V rail** — 3 ppm/°C reference for DAC accuracy.
-11. **Separate TX/RX antennas (24 dBi)** — avoids TX-RX coupling issues of a shared antenna + circulator. 24 dBi needed for 3 km link budget.
-12. **ADC3642IRSBR (dual 14-bit, 25 MSPS)** — +22.7 dB oversampling gain (~17.8 effective bits). Dual channel reserved for future I/Q. Chosen over single-channel ADCs for expansion headroom, over 250 MSPS parts to save power.
-13. **STM32H723VGT6 as signal processor** — Cortex-M7 @ 550 MHz with hardware FPU runs 1024-point FFT in ~50 µs. DCMI captures ADC3642 parallel output natively. 320 KB SRAM with on-the-fly decimation.
+11. **Separate TX/RX antennas (24 dBi)** — avoids TX-RX coupling issues of a shared antenna + circulator. 24 dBi needed for ~1 km small-drone detection.
+12. **ADC3642IRSBR (dual 14-bit, 25 MSPS)** — oversampled vs IF. Dual channel reserved for future I/Q. **Effective-bits claim (~17.8) is theoretical — depends on ADC linearity, jitter, and decimation filter design.**
+13. **STM32H723VGT6 as signal processor** — Cortex-M7 @ 550 MHz with single-precision FPU runs 1024-point FFT in ~50 µs. DCMI captures ADC3642 parallel output natively. **564 KB SRAM** with on-the-fly decimation.
 14. **Single IF channel for prototype 1** — one mixer, one IF chain, ADC channel A only. Triangular ramp (up + down chirp) extracts range and velocity without I/Q. Channel B and second mixer deferred to rev 2.
-15. **Configurable ramp time in firmware** — 10 ms for search (3 km, 100 Hz update), 1 ms for tracking (600 m, 1 kHz update). LPF can be swapped (33 pF for 4.8 MHz, 820 pF for 194 kHz) depending on mode.
-16. **IF LPF: 1 kΩ + 33 pF (fc ≈ 4.8 MHz)** — passes full IF range for all ramp configs. For search mode only, can swap to 820 pF (194 kHz) for better noise rejection.
+15. **Configurable ramp time in firmware** — 10 ms for search (1.5 km, 5–10 Hz scan), 1 ms for fast detection (500 m, 50–100 Hz scan). LPF: 33 pF (4.8 MHz) for fast, 820 pF (194 kHz) for search.
+16. **IF LPF: 1 kΩ + 33 pF (fc ≈ 4.8 MHz)** — passes full IF range for fast mode. For search mode, swap to 820 pF (194 kHz) for better noise rejection.
+
+---
 
 ## Implementation Tasks
 
 ### Phase 0: Documentation
 
-- [ ] Update Lyrion-Radar README.md with: ADC3642IRSBR, STM32H723VGT6, single-IF architecture, 1-3 km range target, 24 dBi antennas, corrected OPA838 GBW (300 MHz), revised IF chain (×10 + MCP6S91 AGC), chirp configurations, link budget at 1-3 km
-- [ ] Push to GitHub
+- [x] Update Lyrion-Radar README.md with honest range claims, corrected f_IF table, R⁴ scaling, corrected pad values, QPL9547 band-edge caveat, regulatory note
+- [x] Update PLAN.md with same corrections
 
 ### Phase 1: Signal Source (VCO + DAC + Calibration)
 
@@ -222,12 +260,13 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 - [ ] Wire SPI from H723 to DAC8830
 - [ ] Measure VCO frequency vs. DAC code on spectrum analyzer (100 mV steps, 0–5 V)
 - [ ] Build inverse LUT: `dac_lut[1000]` mapping 5500–6000 MHz → DAC codes
+- [ ] Measure VCO phase noise and residual FM (critical for coherent integration viability)
 - [ ] Generate ramp in firmware, verify linearity on SA
 - [ ] Add TMP102, implement temperature compensation offset
 
 ### Phase 2: TX Chain
 
-- [ ] Solder 6 dB resistive pad (68Ω + 2×150Ω, 0603 thin-film)
+- [ ] Solder 6 dB π-pad (**150 Ω / 37.4 Ω / 150 Ω**, corrected)
 - [ ] Solder YG802020W with EVB-03 matching (68 nH bias, 1000 pF bypass, 1 pF DC block)
 - [ ] Solder GP2X+ divider
 - [ ] Verify +11.4 dBm on both output ports with SA or power meter
@@ -235,6 +274,7 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 
 ### Phase 3: RX Chain + Mixer
 
+- [ ] **Measure QPL9547 NF and gain at 5.75 GHz** (noise figure meter + VNA)
 - [ ] Solder QPL9547 LNA (follow Qorvo EVB layout)
 - [ ] Build YX18 mixer with 2× NCS4-63+ baluns on PCB
   - RF balun: unbalanced port → LNA output, balanced ports → YX18 pins 1,6
@@ -254,14 +294,15 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 - [ ] ADC3642 SPI config driver (sample rate, output format, channel select)
 - [ ] DCMI + DMA double-buffered capture (25 MSPS, 14-bit, synchronized to ramp via TIM)
 - [ ] On-the-fly decimation in DMA ISR (25 MSPS → ~200 kSPS, boxcar average)
-- [ ] Range FFT (256–2048 point, CMSIS-DSP `arm_cfft_f32`, magnitude, peak detection)
+- [ ] Range FFT (1024–4096 point, CMSIS-DSP `arm_cfft_f32`, single-precision, magnitude, peak detection)
 - [ ] Range calculation: R = f_IF × c × T / (2B)
 - [ ] Triangular ramp: up/down chirp pairing for range + velocity extraction
-- [ ] Coherent integration: stack 64–256 chirps, 2D FFT (range-Doppler map)
+- [ ] **Coherent vs noncoherent integration** — test both, measure actual SNR improvement
 - [ ] MTI: subtract consecutive range profiles to reject stationary clutter
 - [ ] CFAR detection on range-Doppler map
+- [ ] Velocity aliasing detection and unwrapping
 - [ ] USB/UART output: range bins, FFT spectrum, AGC state, detected targets
-- [ ] Optional: micro-Doppler spectrogram for drone/bird discrimination
+- [ ] Optional: micro-Doppler spectrogram (separate high-PRF mode)
 - [ ] Optional: second ADC channel for I/Q (future rev, better clutter rejection)
 
 ### Phase 5: Integration + Validation
@@ -271,16 +312,18 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 - [ ] Test AGC convergence at various ranges
 - [ ] Thermal test: heat/cool board, verify TMP102 compensation
 - [ ] Measure TX leakage into RX (antenna isolation)
-- [ ] Test coherent integration (64 chirps) — verify +18 dB SNR improvement
-- [ ] Drone detection test: fly a small drone (DJI Mini class, σ≈0.01 m²) at 500 m, 1 km, 2 km
-- [ ] Verify Doppler extraction: distinguish hovering drone from stationary clutter
-- [ ] Bird vs. drone discrimination: compare micro-Doppler signatures
+- [ ] **Measure integration gain**: 1 chirp vs 64 chirps SNR — is it +9 dB (noncoherent) or +18 dB (coherent)?
+- [ ] Drone detection test: fly a small drone (DJI Mini class, σ≈0.01 m²) at 500 m, 1 km
+- [ ] Verify Doppler extraction: distinguish moving drone from stationary clutter
+- [ ] Bird vs. drone discrimination: if feasible with current chirp rate
+
+---
 
 ## PCB Layout Guidelines
 
 - **4-layer stackup recommended**: Signal / GND / Power / Signal
-- **RF traces**: 50 Ω microstrip, ~3 mm wide on 1.6 mm FR4 (εr ≈ 4.4)
-- **VCO placement**: Keep 6 dB pad resistors within 2 mm of VCO RF output pin
+- **RF traces**: 50 Ω microstrip, ~3 mm wide on 1.6 mm FR4 (εr ≈ 4.4). **Note: FR4 at 5.5–6 GHz has higher loss and εr tolerance than at lower frequencies. Rogers/RF-35 preferred for RF path in production.**
+- **VCO placement**: Keep 6 dB π-pad resistors within 2 mm of VCO RF output pin
 - **Ground**: Solid ground plane under all RF components, multiple vias around GND pads
 - **Mixer**: NCS4-63+ baluns as close as possible to YX18, symmetric trace lengths
 - **Power**: Separate ADP150 for VCO (ultra-low noise), star-ground analog and digital
@@ -288,7 +331,9 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 - **TMP102**: Place within 3 mm of VCO for thermal coupling
 - **IF section**: Keep OPA838 and MCP6S91 away from RF section, ground guard between
 - **ADC3642**: Place close to STM32H723 DCMI pins, matched-length parallel data traces (< 5 mm skew), separate analog/digital ground connection at ADC pad
-- **STM32H723**: Keep DCMI data bus traces short and equal-length; place 100 nF bypass on every VDD pin; separate 3.3 V digital supply from 5 V analog
+- **STM32H723**: Keep DCMI data bus traces short and equal-length; place 100 nF bypass on every VDD pin; separate 3.3 V digital supply from 5 V analog. **DCMI framing (HSYNC/VSYNC/embedded sync) needs careful handling — not plug-and-play.**
+
+---
 
 ## Risks and Mitigations
 
@@ -302,20 +347,26 @@ Drone velocities: 5–20 m/s (hover to fast flight). Birds: 5–15 m/s. This ove
 | REF5050A dropout (needs >5.3 V) | No reference | 12 V rail confirmed available |
 | ADC3642 parallel interface timing | Data corruption | Use DCMI peripheral; verify with logic analyzer |
 | 25 MSPS data rate exceeds H723 SRAM | Dropped samples | On-the-fly decimation in DMA ISR; only store decimated samples |
-| 3 km person detection marginal (SNR −5.5 dB) | Miss small targets | 64-chirp coherent integration (+18 dB); PA upgrade in rev 2 |
-| MCP6S91 BW at ×32 (562 kHz) limits short-ramp long-range | Can't do 1 ms ramp at 3 km | Use 10 ms ramp for 3 km (f_IF=100 kHz); upgrade to AD603 if needed |
-| Drone RCS very small (σ=0.01 m²) | Low SNR at range | Coherent integration (64-256 chirps) is mandatory; PA upgrade for >2 km |
-| Bird clutter mimics drone returns | False alarms | Micro-Doppler analysis (rotor modulation 100-500 Hz); I/Q upgrade for better MTI |
-| VCO phase noise masks small drone returns | Reduced sensitivity | Free-running VCO PN ~-80 dBc/Hz @ 100 kHz; acceptable for 1-2 km; PLL upgrade if needed |
-| H723 SRAM insufficient for 256-chirp integration | Can't stack enough chirps | Process in blocks; stream to external SDRAM via FMC; or reduce to 64 chirps |
+| **Open-loop VCO phase incoherence** | Integration gain only +9 dB (noncoherent) not +18 dB (coherent) | Measure residual FM/PN; if too poor, add PLL (ADF4158) in rev 2 |
+| **QPL9547 NF at 5.75 GHz unverified** | System NF may be 1.5–2 dB, not 1 dB | Measure on NF meter; add 2 dB margin to all range claims |
+| **f_IF at 1.5 km with 5 ms ramp = 1 MHz** | Exceeds MCP6S91 ×32 BW (562 kHz) | Use 1.5 km max range or lower AGC gain |
+| **v_max at 10 ms = 0.625 m/s** | Drones alias | Use Fast mode (1 ms) for detection; triangular pairing has same limit |
+| **Micro-Doppler infeasible at long ramp** | Can't discriminate drone vs. bird at 1+ km | Add separate high-PRF discriminator mode (future) |
+| **+35 dBm EIRP not ISM** | Regulatory issue | Acquire experimental/STA license; or reduce EIRP |
+| **FR4 at 5.5–6 GHz** | Higher insertion loss, εr tolerance | Acceptable for prototype; Rogers for production |
+| **Decimation aliasing** | IF above 100 kHz aliases to 200 kSPS Nyquist | 4.8 MHz LPF + AGC bandwidth limits handle this — verify with spectrum |
+| H723 SRAM (564 KB) borderline for 4096-pt × 64-chirp 2D FFT | Memory pressure | Process in blocks; or use 64-pt × 1024-range instead of 4096-pt × 256-range |
+
+---
 
 ## Open Questions (resolve during implementation)
 
-- OPA838 gain: ×10 is the plan; verify with actual mixer IF levels and adjust R2 if needed
-- IF LPF: start with 33 pF (4.8 MHz); swap to 820 pF (194 kHz) for search mode if noise is an issue
-- Antenna type: 8×8 patch array (~30×30 cm) or parabolic dish (~40 cm) for 24 dBi at 5.75 GHz
-- ADC3642 interface: parallel CMOS via DCMI — measure actual throughput on H723
-- Decimation filter: start with boxcar (125-tap moving average); upgrade to FIR if sidelobes are a problem
-- ADC3642 analog input range: 2 Vpp or 3.5 Vpp — match to MCP6S91 output swing
-- FPGA (Artix-7 35T): deferred to rev 2 if dual-channel I/Q or MIMO is needed
-- PA upgrade: MMG3H21NT1 (+30 dBm P1dB, $6) or HMC637 (+30 dBm, $15) for rev 2
+- **QPL9547 NF/gain at 5.75 GHz**: **MUST measure** on noise-figure meter before relying on range claims
+- **VCO residual FM/PN**: **MUST measure** to determine if coherent integration is viable
+- **OPA838 gain**: ×10 is the plan. Verify with actual mixer IF levels.
+- **IF LPF**: start with 33 pF (4.8 MHz). May need to adjust for decimation anti-aliasing.
+- **Antenna type**: 8×8 patch array (~30×30 cm) or parabolic dish (~40 cm)
+- **ADC3642 input range**: 2 Vpp or 3.5 Vpp — configure via SPI
+- **Decimation filter**: boxcar vs. FIR
+- **Coherent vs noncoherent integration**: measure on actual hardware
+- **Future**: PA upgrade (MMG3H21NT1, +27 dBm TX), I/Q upgrade, FPGA offload, PLL for coherent integration, high-PRF micro-Doppler mode
