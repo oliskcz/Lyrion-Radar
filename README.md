@@ -68,58 +68,64 @@ The design is built around a **phase-locked loop** (not an open-loop DAC) for ch
 
 ## System Overview
 
-The radar is split into three functional blocks: **chirp source** (PLL), **analog front-end** (TX/RX), and **digital processing** (ADC + FPGA + MCU).
-
 ```mermaid
-graph TB
-    subgraph CHIRP["Chirp Source (PLL)"]
-        TCXO["TCXO<br/>100 MHz"]
-        PLL["ADF41510<br/>Fractional-N PLL<br/>Built-in ramp gen"]
-        LPF["Loop Filter<br/>Active op-amp<br/>100 kHz BW"]
-        VCO["YSGM556006<br/>VCO in PLL loop<br/>5.5–6 GHz, +6 dBm"]
-        TCXO --> PLL
-        PLL --> LPF --> VCO
-    end
+graph LR
+    %% Chirp Source
+    TCXO[TCXO<br/>100 MHz]
+    PLL[ADF41510<br/>Fractional-N PLL]
+    LPF[Loop Filter]
+    VCO[YSGM556006 VCO<br/>5.5–6 GHz]
 
-    subgraph TX["TX Chain"]
-        PAD["6 dB π-pad"]
-        PA["YG802020W<br/>TX driver<br/>+15 dB gain"]
-        DIV["GP2X+<br/>2-way divider<br/>-3.6 dB"]
-        TXANT["TX Antenna<br/>24 dBi"]
-        VCO --> PAD --> PA --> DIV
-        DIV -->|"+11.4 dBm"| TXANT
-    end
+    %% TX Path
+    PAD[6 dB pad]
+    PA[YG802020W<br/>+15 dB]
+    DIV[GP2X+<br/>divider]
+    TXANT[TX Ant<br/>24 dBi]
 
-    subgraph RX["RX Chain"]
-        RXANT["RX Antenna<br/>24 dBi"]
-        LNA["QPL9547<br/>LNA<br/>~1 dB NF"]
-        BALUN1["NCS4-63+<br/>Balun 1:4"]
-        MIXER["YX18<br/>Diode mixer<br/>-7 dB conv loss"]
-        LPF2["RC LPF<br/>4.8 MHz"]
-        IFAMP["OPA838<br/>IF preamp ×10"]
-        AGC["MCP6S91<br/>PGA 1–32×"]
-        RXANT --> LNA --> BALUN1 --> MIXER
-        DIV -->|"LO +11.4 dBm"| MIXER
-        MIXER --> LPF2 --> IFAMP --> AGC
-    end
+    %% RX Path
+    RXANT[RX Ant<br/>24 dBi]
+    LNA[QPL9547<br/>LNA]
+    MIXER[YX18<br/>mixer]
+    IFAMP[OPA838 ×10]
+    AGC[MCP6S91<br/>AGC]
 
-    subgraph DSP["Digital Processing"]
-        ADC["AD9643<br/>14-bit, 250 MSPS<br/>LVDS"]
-        FPGA["Xilinx XC7A100T<br/>Artix-7 FPGA<br/>DDC → FFT → CFAR"]
-        MCU["STM32H503<br/>Housekeeping MCU<br/>PLL/AGC/Temp config"]
-        PC["PC<br/>Range-Doppler display"]
-        AGC --> ADC --> FPGA
-        FPGA -->|"UART/USB"| PC
-        MCU -.->|"SPI config"| PLL
-        MCU -.->|"SPI AGC"| AGC
-        MCU -.->|"I²C temp"| TMP102["TMP102"]
-    end
+    %% Digital
+    ADC[AD9643<br/>250 MSPS]
+    FPGA[XC7A100T<br/>FPGA DSP]
+    MCU[STM32H503<br/>MCU]
+    PC[PC display]
 
-    style CHIRP fill:#e1f5ff
-    style TX fill:#fff3e0
-    style RX fill:#f3e5f5
-    style DSP fill:#e8f5e9
+    %% Chirp Source flow
+    TCXO --> PLL --> LPF --> VCO
+
+    %% TX flow
+    VCO --> PAD --> PA --> DIV
+    DIV -->|+11 dBm| TXANT
+    DIV -->|LO| MIXER
+
+    %% RX flow
+    RXANT --> LNA --> MIXER
+    MIXER --> IFAMP --> AGC --> ADC --> FPGA --> PC
+
+    %% MCU control
+    MCU -. SPI .-> PLL
+    MCU -. SPI .-> AGC
+
+    %% Subtle styling
+    classDef chirp fill:#f6f8fa,stroke:#8b949e,color:#24292f
+    classDef rf fill:#f6f8fa,stroke:#8b949e,color:#24292f
+    classDef digital fill:#f6f8fa,stroke:#8b949e,color:#24292f
+
+    class TCXO,PLL,LPF,VCO chirp
+    class PAD,PA,DIV,TXANT,RXANT,LNA,MIXER,IFAMP,AGC rf
+    class ADC,FPGA,MCU,PC digital
 ```
+
+**Block legend:**
+- **Chirp source** (PLL): TCXO → ADF41510 → loop filter → VCO
+- **TX chain**: VCO → 6 dB pad → YG802020W PA → GP2X+ divider → TX antenna (+ LO to mixer)
+- **RX chain**: RX antenna → QPL9547 LNA → YX18 mixer → OPA838 IF amp → MCP6S91 AGC → AD9643 ADC → XC7A100T FPGA → PC
+- **Control**: STM32H503 MCU configures the PLL (SPI), AGC (SPI), and receives data from the FPGA (UART)
 
 ---
 

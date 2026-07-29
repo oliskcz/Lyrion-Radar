@@ -16,53 +16,56 @@ Design and build a complete FMCW radar front-end at 5.5–6 GHz for **drone dete
 ## System Architecture
 
 ```mermaid
-graph TB
-    subgraph CHIRP["Chirp Source (PLL)"]
-        TCXO["TCXO 100 MHz"]
-        PLL["ADF41510<br/>Fractional-N PLL"]
-        LPF["Loop Filter<br/>100 kHz BW"]
-        VCO["YSGM556006<br/>VCO in PLL loop"]
-        TCXO --> PLL --> LPF --> VCO
-    end
+graph LR
+    %% Chirp Source
+    TCXO[TCXO<br/>100 MHz]
+    PLL[ADF41510<br/>Fractional-N PLL]
+    LPF[Loop Filter]
+    VCO[YSGM556006 VCO<br/>5.5–6 GHz]
 
-    subgraph TX["TX Chain"]
-        PAD["6 dB π-pad<br/>150/37.4/150"]
-        PA["YG802020W<br/>+15 dB"]
-        DIV["GP2X+<br/>2-way divider"]
-        TXANT["TX Antenna 24 dBi"]
-        VCO --> PAD --> PA --> DIV
-        DIV -->|+11.4 dBm| TXANT
-    end
+    %% TX Path
+    PAD[6 dB pad]
+    PA[YG802020W<br/>+15 dB]
+    DIV[GP2X+<br/>divider]
+    TXANT[TX Ant<br/>24 dBi]
 
-    subgraph RX["RX Chain"]
-        RXANT["RX Antenna 24 dBi"]
-        LNA["QPL9547<br/>LNA ~1 dB NF"]
-        BALUN["NCS4-63+<br/>Balun 1:4"]
-        MIXER["YX18<br/>Diode mixer"]
-        LPF2["RC LPF 4.8 MHz"]
-        IFAMP["OPA838 ×10"]
-        AGC["MCP6S91<br/>AGC 0-30 dB"]
-        RXANT --> LNA --> BALUN --> MIXER
-        DIV -->|LO +11.4 dBm| MIXER
-        MIXER --> LPF2 --> IFAMP --> AGC
-    end
+    %% RX Path
+    RXANT[RX Ant<br/>24 dBi]
+    LNA[QPL9547<br/>LNA]
+    MIXER[YX18<br/>mixer]
+    IFAMP[OPA838 ×10]
+    AGC[MCP6S91<br/>AGC]
 
-    subgraph DSP["Digital Processing"]
-        ADC["AD9643<br/>14-bit, 250 MSPS"]
-        FPGA["Xilinx XC7A100T<br/>Artix-7 FPGA"]
-        MCU["STM32H503<br/>Housekeeping MCU"]
-        PC["PC<br/>Range-Doppler display"]
-        AGC --> ADC --> FPGA
-        FPGA -->|UART/USB| PC
-        MCU -.->|SPI config| PLL
-        MCU -.->|SPI AGC| AGC
-        MCU -.->|I²C temp| TMP102["TMP102"]
-    end
+    %% Digital
+    ADC[AD9643<br/>250 MSPS]
+    FPGA[XC7A100T<br/>FPGA DSP]
+    MCU[STM32H503<br/>MCU]
+    PC[PC display]
 
-    style CHIRP fill:#e1f5ff
-    style TX fill:#fff3e0
-    style RX fill:#f3e5f5
-    style DSP fill:#e8f5e9
+    %% Chirp Source flow
+    TCXO --> PLL --> LPF --> VCO
+
+    %% TX flow
+    VCO --> PAD --> PA --> DIV
+    DIV -->|+11 dBm| TXANT
+    DIV -->|LO| MIXER
+
+    %% RX flow
+    RXANT --> LNA --> MIXER
+    MIXER --> IFAMP --> AGC --> ADC --> FPGA --> PC
+
+    %% MCU control
+    MCU -. SPI .-> PLL
+    MCU -. SPI .-> AGC
+
+    %% Subtle styling
+    classDef chirp fill:#f6f8fa,stroke:#8b949e,color:#24292f
+    classDef rf fill:#f6f8fa,stroke:#8b949e,color:#24292f
+    classDef digital fill:#f6f8fa,stroke:#8b949e,color:#24292f
+
+    class TCXO,PLL,LPF,VCO chirp
+    class PAD,PA,DIV,TXANT,RXANT,LNA,MIXER,IFAMP,AGC rf
+    class ADC,FPGA,MCU,PC digital
 ```
 
 ---
