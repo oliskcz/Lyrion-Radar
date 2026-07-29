@@ -172,23 +172,38 @@ flowchart TB
     end
 
     subgraph TX["TX Chain"]
-        VCO --> PAD[/"6 dB<br/>Pad"\] --> PA>"PA"] --> DIV(("Divider"))
-        DIV --> TXANT[/"TX Ant"\]
+        VCO --> PAD[/"6 dB Pad"\] --> PA>"PA"] --> DIV(("Divider"))
+        DIV --> TXANT[/"TX Antenna"\]
     end
 
     subgraph RX["RX Chain"]
-        RXANT[/"RX Ant"\] --> LNA>"LNA"] --> MIX(("Mixer"))
+        RXANT[/"RX Antenna"\] --> LNA>"LNA"] --> MIX(("Mixer"))
         DIV -. LO .-> MIX
         MIX --> IFA>"IF Amp"] --> AGC>"AGC"] --> ADC[/"ADC"\] --> FPGA["FPGA"] --> PC(["PC"])
-        MCU["MCU"] -. SPI .-> AGC
     end
 
     TXANT -. radiates .-> TARGET(["Drone"])
     TARGET -. echoes .-> RXANT
 
-    style CHIRP fill:#fafbfc,stroke:#d0d7de
-    style TX fill:#fafbfc,stroke:#d0d7de
-    style RX fill:#fafbfc,stroke:#d0d7de
+    %% Subtle but visible subgraph backgrounds
+    style CHIRP fill:#f6f8fa,stroke:#8b949e,stroke-width:1px,color:#24292f
+    style TX fill:#f6f8fa,stroke:#8b949e,stroke-width:1px,color:#24292f
+    style RX fill:#f6f8fa,stroke:#8b949e,stroke-width:1px,color:#24292f
+
+    %% Explicit shape fills with readable text
+    style VCO fill:#fff,stroke:#24292f,color:#24292f
+    style DIV fill:#fff,stroke:#24292f,color:#24292f
+    style MIX fill:#fff,stroke:#24292f,color:#24292f
+    style PC fill:#fff,stroke:#24292f,color:#24292f
+    style PAD fill:#fff,stroke:#24292f,color:#24292f
+    style TXANT fill:#fff,stroke:#24292f,color:#24292f
+    style RXANT fill:#fff,stroke:#24292f,color:#24292f
+    style PA fill:#fff,stroke:#24292f,color:#24292f
+    style LNA fill:#fff,stroke:#24292f,color:#24292f
+    style IFA fill:#fff,stroke:#24292f,color:#24292f
+    style AGC fill:#fff,stroke:#24292f,color:#24292f
+    style ADC fill:#fff,stroke:#24292f,color:#24292f
+    style FPGA fill:#fff,stroke:#24292f,color:#24292f
     style TARGET fill:#fff8c5,stroke:#d4a72c,color:#24292f
 ```
 
