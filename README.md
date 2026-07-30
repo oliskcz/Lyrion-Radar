@@ -2,14 +2,14 @@
   <h1 align="center">Lyrion Radar</h1>
   <p align="center">
     <strong>FMCW Radar for Counter-UAS (Drone Detection)</strong><br>
-    5.5–6 GHz · I/Q demodulation · 30 cm range resolution · 1.5–3.5 km detection
+    5.5 to 6 GHz, I/Q demodulation, 30 cm range resolution, 1.5 to 3.5 km detection
   </p>
 </p>
 
 <p align="center">
   <a href="#what-is-it"><img alt="Status: Planning" src="https://img.shields.io/badge/Status-Planning-bf8700?style=flat-square"></a>
-  <a href="#key-features"><img alt="Band: 5.5–6 GHz" src="https://img.shields.io/badge/Band-5.5%E2%80%936%20GHz-0969da?style=flat-square"></a>
-  <a href="#link-budget"><img alt="Range: 1.5–3 km" src="https://img.shields.io/badge/Range-1.5%E2%80%933%20km-1a7f37?style=flat-square"></a>
+  <a href="#key-features"><img alt="Band: 5.5 to 6 GHz" src="https://img.shields.io/badge/Band-5.5%20to%206%20GHz-0969da?style=flat-square"></a>
+  <a href="#link-budget"><img alt="Range: 1.5 to 3 km" src="https://img.shields.io/badge/Range-1.5%20to%203%20km-1a7f37?style=flat-square"></a>
   <a href="#key-features"><img alt="Resolution: 30 cm" src="https://img.shields.io/badge/Resolution-30%20cm-6639ba?style=flat-square"></a>
   <a href="#license"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-1a7f37?style=flat-square"></a>
 </p>
@@ -18,32 +18,27 @@
 
 ## Table of Contents
 
-- [What is it?](#what-is-it)
-- [Key Features](#key-features)
-- [System Overview](#system-overview)
-- [How it Works](#how-it-works)
-- [Components](#components)
-- [Signal Chain](#signal-chain)
-- [Link Budget](#link-budget)
-- [Chirp Modes](#chirp-modes)
-- [Why PLL + FPGA?](#why-pll--fpga)
-- [Design Decisions](#design-decisions)
-- [Status & Roadmap](#status--roadmap)
-- [Known Limitations](#known-limitations)
-- [License](#license)
+1. [What is it?](#what-is-it)
+2. [Key Features](#key-features)
+3. [System Overview](#system-overview)
+4. [How it Works](#how-it-works)
+5. [Components](#components)
+6. [Signal Chain](#signal-chain)
+7. [Link Budget](#link-budget)
+8. [Chirp Modes](#chirp-modes)
+9. [Why PLL + FPGA?](#why-pll--fpga)
+10. [Design Decisions](#design-decisions)
+11. [Status & Roadmap](#status--roadmap)
+12. [Known Limitations](#known-limitations)
+13. [License](#license)
 
 ---
 
 ## What is it?
 
-Lyrion Radar is a **Frequency-Modulated Continuous-Wave (FMCW) radar** designed to detect small drones (DJI Phantom class and larger). It uses a **fractional-N PLL for chirp generation**, a **Xilinx Artix-7 FPGA for real-time signal processing**, and a **14-bit 250 MSPS ADC** for IF digitization. Detection range is 1–3 km depending on the antenna and target size (see [Link Budget](#link-budget)).
+Lyrion Radar is a **Frequency-Modulated Continuous-Wave (FMCW) radar** designed to detect small drones (DJI Phantom class and larger). It uses a **fractional-N PLL for chirp generation**, a **Xilinx Artix-7 FPGA for real-time signal processing**, and a **14-bit 250 MSPS ADC** for IF digitization. Detection range is 1 to 3 km depending on the antenna and target size (see [Link Budget](#link-budget)).
 
-The design is built around a **phase-locked loop** (not an open-loop DAC) for chirp coherence, and an **FPGA** (not a microcontroller) for the real-time DSP pipeline. This enables:
-
-- **True coherent integration** across 64+ chirps (+18 dB SNR)
-- **Micro-Doppler analysis** (drone rotor blade modulation at 100–500 Hz)
-- **2D range-Doppler maps** in real-time
-- **Deterministic latency** for tracking
+The design is built around a **phase-locked loop** (not an open-loop DAC) for chirp coherence, and an **FPGA** (not a microcontroller) for the real-time DSP pipeline. This enables **true coherent integration** across 64+ chirps (+18 dB SNR), **micro-Doppler analysis** of drone rotor blade modulation at 100 to 500 Hz, **2D range-Doppler maps** in real time, and **deterministic latency** for tracking.
 
 ---
 
@@ -51,9 +46,9 @@ The design is built around a **phase-locked loop** (not an open-loop DAC) for ch
 
 | Feature | Specification |
 |---------|---------------|
-| **Frequency band** | 5.5 – 6.0 GHz (500 MHz sweep) |
+| **Frequency band** | 5.5 to 6.0 GHz (500 MHz sweep) |
 | **Range resolution** | 30 cm |
-| **Demodulation** | I/Q (complex) — LTC5586 |
+| **Demodulation** | I/Q (complex), LTC5586 |
 | **Max range, 24 dBi (small drone, σ=0.01 m²)** | ~1.5 km |
 | **Max range, 24 dBi (medium drone, σ=0.1 m²)** | ~2.3 km |
 | **Max range, 27 dBi (small drone, σ=0.01 m²)** | ~2 km |
@@ -66,7 +61,7 @@ The design is built around a **phase-locked loop** (not an open-loop DAC) for ch
 | **TX power** | +11.4 dBm (prototype 1) |
 | **Antenna gain** | 21/24/27 dBi each (StarterDish™ UM) | TX and RX separate |
 | **EIRP** | +35.4 dBm (3.5 W ERP) |
-| **Scan rate** | 100 Hz – 10 kHz (configurable) |
+| **Scan rate** | 100 Hz to 10 kHz (configurable) |
 | **BOM cost** | ~$250 (with Arty A7-100T dev board) |
 
 ---
@@ -81,7 +76,7 @@ flowchart LR
     REF((("TCXO<br/>100 MHz")))
     PLL(["ADF41510<br/>PLL"])
     LF{"Loop<br/>Filter"}
-    VCO(("VCO<br/>5.5–6 GHz"))
+    VCO(("VCO<br/>5.5 to 6 GHz"))
 
     %% TX Chain
     PAD[/"6 dB<br/>Pad"\]
@@ -142,14 +137,14 @@ flowchart LR
 
 | Block | Function | Key parts |
 |-------|----------|-----------|
-| **Chirp Source** | Generates a linear 5.5–6 GHz chirp | ADF41510 PLL, YSGM556006 VCO, 100 MHz TCXO, loop filter |
+| **Chirp Source** | Generates a linear 5.5 to 6 GHz chirp | ADF41510 PLL, YSGM556006 VCO, 100 MHz TCXO, loop filter |
 | **TX Chain** | Amplifies and transmits the chirp | YG802020W PA (+15 dB), GP2X+ divider, 24 dBi antenna |
 | **RX Chain** | I/Q demodulation, filtering, AGC | QPL9547 LNA, LTC5586 I/Q demod, LC LPF 70 MHz, LMH6521 dual DVGA |
 | **Digital Processing** | Digitises and processes I/Q signals | AD9643 dual ADC, XC7A100T-2FTG256I FPGA, STM32H503CBU6 MCU |
 
 ### Signal flow
 
-1. The **PLL** generates a linear frequency ramp (5.5–6 GHz) locked to a TCXO reference.
+1. The **PLL** generates a linear frequency ramp (5.5 to 6 GHz) locked to a TCXO reference.
 2. The **VCO output** splits: one path goes to the TX chain (amplified and radiated), the other to the mixer as the local oscillator.
 3. **Target echoes** enter the RX chain, are amplified by the LNA, and mixed with the LO to produce a low-frequency IF beat note.
 4. The IF signal is filtered, amplified, and digitised by the **ADC** at 250 MSPS.
@@ -165,20 +160,16 @@ flowchart LR
 The radar transmits a signal whose **frequency sweeps linearly over time** (a "chirp"). The signal reflects off a target and returns after a time delay `τ = 2R/c`. Mixing the received signal with the current transmit signal produces a **beat frequency** directly proportional to target range:
 
 ```
-f_IF = (2 · B · R) / (c · T)
+f_IF = (2 × B × R) / (c × T)
 ```
 
-Where:
-- **B** = sweep bandwidth (500 MHz)
-- **R** = target range
-- **c** = speed of light
-- **T** = ramp time (1–10 ms)
+Where **B** is the sweep bandwidth (500 MHz), **R** is the target range, **c** is the speed of light, and **T** is the ramp time (1 to 10 ms).
 
 An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **triangular ramp** (up-chirp + down-chirp) extracts both range and velocity.
 
 ### Signal Flow
 
-1. **PLL generates chirp** (5.5–6 GHz, linear ramp)
+1. **PLL generates chirp** (5.5 to 6 GHz, linear ramp)
 2. **TX chain** amplifies and splits the signal to the TX antenna and the mixer LO
 3. **RX chain** amplifies echoes (LNA), I/Q demodulates (LTC5586), filters (LC LPF 70 MHz), applies AGC (LMH6521), and digitizes both I and Q (AD9643 dual channel)
 4. **FPGA** processes the complex I/Q signal: DDC → decimate → FFT → 2D FFT → CFAR detection
@@ -193,8 +184,8 @@ An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **
 
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
-| **YSGM556006** | Innotion | VCO (in PLL loop) | 5320–6060 MHz, +6 dBm, 0–5 V tune |
-| **ADF41510** | Analog Devices | Fractional-N PLL | 1–10 GHz, −231 dBc/Hz, built-in ramp gen |
+| **YSGM556006** | Innotion | VCO (in PLL loop) | 5320 to 6060 MHz, +6 dBm, 0 to 5 V tune |
+| **ADF41510** | Analog Devices | Fractional-N PLL | 1 to 10 GHz, −231 dBc/Hz, built-in ramp gen |
 | **TCXO 100 MHz** | ECS Inc | PLL reference | ±1 ppm, low phase noise |
 
 ### Analog Front-End
@@ -202,9 +193,9 @@ An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **
 | Part | Manufacturer | Role | Key Specs |
 |------|-------------|------|-----------|
 | **YG802020W** | Innotion | TX driver | +15 dB gain, P1dB +16 dBm @ 5.5 GHz |
-| **GP2X+** | Mini-Circuits | 2-way divider | 2.9–6.2 GHz, 3.6 dB loss, 20 dB isolation |
+| **GP2X+** | Mini-Circuits | 2-way divider | 2.9 to 6.2 GHz, 3.6 dB loss, 20 dB isolation |
 | **QPL9547TR7** | Qorvo | RX LNA | 0.3 dB NF, +11.2 dB gain @ 5.5 GHz (S21), 39 dBm OIP3 |
-| **LTC5586IUKG#PBF** | ADI | I/Q demodulator | 300 MHz–6 GHz, diff I/Q out, SPI (DC null, 31 dB RF atten, image reject) |
+| **LTC5586IUKG#PBF** | ADI | I/Q demodulator | 300 MHz to 6 GHz, diff I/Q out, SPI (DC null, 31 dB RF atten, image reject) |
 | **LMH6521SQE/NOPB** | TI | Dual DVGA (AGC) | 1400 MHz BW, −5.5 to +26 dB, 0.5 dB steps, SPI, diff I/O |
 
 ### Digital Processing
@@ -228,24 +219,22 @@ An **FFT** of this beat signal reveals targets as distinct frequency peaks. A **
 
 ### Antennas
 
-The radar supports the **StarterDish™ UM** family of 5.5–6 GHz parabolic dish antennas. Three gain variants are available — pick based on your range vs. portability trade-off:
+The radar supports the **StarterDish™ UM** family of 5.5 to 6 GHz parabolic dish antennas. Three gain variants are available, pick based on your range vs. portability trade-off:
 
 | Variant | Gain | Approx. dish size | Best for |
 |---------|------|-------------------|----------|
 | **StarterDish™ 21 UM** | 21 dBi | ~25 cm diameter | Portable, hand-held, short-range (≤ 500 m) |
-| **StarterDish™ 24 UM** (default) | 24 dBi | ~30 cm diameter | Bench/test deployment, mid-range (1–1.5 km) |
-| **StarterDish™ 27 UM** | 27 dBi | ~40 cm diameter | Fixed installation, long-range (2–3 km) |
+| **StarterDish™ 24 UM** (default) | 24 dBi | ~30 cm diameter | Bench/test deployment, mid-range (1 to 1.5 km) |
+| **StarterDish™ 27 UM** | 27 dBi | ~40 cm diameter | Fixed installation, long-range (2 to 3 km) |
 
-**Trade-offs:**
-- **Higher gain** = longer range, but **narrower beam** (~5° at 24 dBi, ~3° at 27 dBi) and bigger dish
-- **Lower gain** = wider beam (~8° at 21 dBi, easier pointing), shorter range
+**Trade-offs:** **Higher gain** gives longer range but a **narrower beam** (~5° at 24 dBi, ~3° at 27 dBi) and a bigger dish, while **lower gain** gives a wider beam (~8° at 21 dBi, easier pointing) and shorter range.
 
 | Item | Spec | Notes |
 |------|------|-------|
 | TX antenna | StarterDish™ 21/24/27 UM | Separate from RX, same model for both |
 | RX antenna | StarterDish™ 21/24/27 UM | Pointed same direction as TX |
 | Polarisation | Linear (H or V) | Match polarisation on both antennas |
-| TX-RX isolation | 30–40 dB | With 1–2 m physical separation |
+| TX-RX isolation | 30 to 40 dB | With 1 to 2 m physical separation |
 
 ### Impact on Link Budget
 
@@ -324,11 +313,7 @@ flowchart TB
     style TARGET fill:#fff8c5,stroke:#d4a72c,color:#24292f
 ```
 
-**Visual conventions:**
-- **Subgraph backgrounds** (`#f6f8fa`): Group boxes for each functional block, visible but not distracting
-- **Shape fills** (`#fff` white): All RF components have a solid white background for text readability
-- **Target/drone** (`#fff8c5` yellow): Highlighted to make the radar's purpose obvious
-- **Arrows**: Solid for signal flow, dotted for RF radiation and control signals
+**Visual conventions:** **Subgraph backgrounds** (`#f6f8fa`) group each functional block, visible but not distracting. **Shape fills** (`#fff` white) give all RF components a solid white background for text readability. The **target/drone** (`#fff8c5` yellow) is highlighted to make the radar's purpose obvious. **Arrows** are solid for signal flow and dotted for RF radiation and control signals.
 
 ---
 
@@ -341,10 +326,10 @@ Conditions: TX power +11.4 dBm, system NF ~5.5 dB (QPL9547 + LTC5586 @ 5.8 GHz),
 | Antenna (each) | Beam width | Best for |
 |----------------|-----------|----------|
 | **StarterDish™ 21 UM** (21 dBi) | ~8° | Short range, portable |
-| **StarterDish™ 24 UM** (24 dBi) | ~5° | Default — mid range |
+| **StarterDish™ 24 UM** (24 dBi) | ~5° | Default, mid range |
 | **StarterDish™ 27 UM** (27 dBi) | ~3° | Long range, fixed install |
 
-### SNR Table — 24 dBi antennas (default)
+### SNR Table, 24 dBi antennas (default)
 
 | Range | σ = 0.01 m² (small drone) | σ = 0.1 m² (medium drone) | σ = 1 m² (large drone) |
 |-------|------------------------------|------------------------------|--------------------------|
@@ -352,9 +337,9 @@ Conditions: TX power +11.4 dBm, system NF ~5.5 dB (QPL9547 + LTC5586 @ 5.8 GHz),
 | **1 km** | **17 dB ✅** | **27 dB ✅** | **37 dB ✅** |
 | 1.5 km | 10 dB ⚠️ | 20 dB ✅ | 30 dB ✅ |
 | 2 km | 5 dB ⚠️ | 15 dB ✅ | 25 dB ✅ |
-| 3 km | — | 8 dB ⚠️ | 18 dB ✅ |
+| 3 km | n/a | 8 dB ⚠️ | 18 dB ✅ |
 
-### SNR Table — 21 dBi antennas (portable, −6 dB vs 24 dBi)
+### SNR Table, 21 dBi antennas (portable, −6 dB vs 24 dBi)
 
 | Range | σ = 0.01 m² (small drone) | σ = 0.1 m² (medium drone) | σ = 1 m² (large drone) |
 |-------|------------------------------|------------------------------|--------------------------|
@@ -363,7 +348,7 @@ Conditions: TX power +11.4 dBm, system NF ~5.5 dB (QPL9547 + LTC5586 @ 5.8 GHz),
 | 1 km | 11 dB ⚠️ | 21 dB ✅ | 31 dB ✅ |
 | 1.5 km | 4 dB ⚠️ | 14 dB ✅ | 24 dB ✅ |
 
-### SNR Table — 27 dBi antennas (long range, +6 dB vs 24 dBi)
+### SNR Table, 27 dBi antennas (long range, +6 dB vs 24 dBi)
 
 | Range | σ = 0.01 m² (small drone) | σ = 0.1 m² (medium drone) | σ = 1 m² (large drone) |
 |-------|------------------------------|------------------------------|--------------------------|
@@ -390,7 +375,7 @@ The radar supports four configurable modes, switchable via SPI to the ADF41510:
 | **Fast** | 1 ms | 500 m | 1 kHz | 6.25 m/s | Close-range, high speed |
 | **Micro-Doppler** | 0.1 ms | 50 m | 10 kHz | 62.5 m/s | Drone vs. bird discrimination |
 
-**Micro-Doppler mode** is the key discriminator: at 10 kHz chirp PRF, the FPGA can resolve 100–500 Hz rotor blade modulation, which is unique to drones.
+**Micro-Doppler mode** is the key discriminator: at 10 kHz chirp PRF, the FPGA can resolve 100 to 500 Hz rotor blade modulation, which is unique to drones.
 
 ---
 
@@ -433,11 +418,11 @@ The VCO you already own is reused as the VCO in the PLL loop. The ADF41510 doesn
 
 ### 5. STM32H503CBU6 for housekeeping (not G071, not H723)
 
-The G071 would technically work for housekeeping, but the H503 gives more headroom for future features at low cost. The H723 is overkill — those are reserved for other projects.
+The G071 would technically work for housekeeping, but the H503 gives more headroom for future features at low cost. The H723 is overkill, those are reserved for other projects.
 
 ### 6. StarterDish™ UM antennas, separate TX/RX
 
-Separate TX and RX antennas (no circulator) provide better isolation than a single antenna + circulator. The [StarterDish™ UM](#antennas) family offers three gain variants (21/24/27 dBi) — pick the one that matches your deployment. For prototype 1, **24 dBi** is the default balance between range and portability. **27 dBi** gives ~6 dB more link margin (extends small-drone range to ~2 km) but requires more accurate pointing due to the narrower beam.
+Separate TX and RX antennas (no circulator) provide better isolation than a single antenna + circulator. The [StarterDish™ UM](#antennas) family offers three gain variants (21/24/27 dBi), pick the one that matches your deployment. For prototype 1, **24 dBi** is the default balance between range and portability. **27 dBi** gives ~6 dB more link margin (extends small-drone range to ~2 km) but requires more accurate pointing due to the narrower beam.
 
 ### 7. LTC5586 I/Q demodulator (not discrete mixer)
 
@@ -447,7 +432,7 @@ The LTC5586 integrates two mixers + 90° LO hybrid + IF amplifiers in one 5×5 m
 
 ### 8. LMH6521 DVGA (not MCP6S91)
 
-The MCP6S91 had 18 MHz gain-bandwidth product — at ×8 gain, bandwidth collapsed to 2.25 MHz, making it useless at radar IF frequencies (3–67 MHz). The LMH6521 maintains 1400 MHz bandwidth at ALL gain settings (−5.5 to +26 dB, 0.5 dB steps). It's a dual-channel part, naturally handling I and Q. SPI-controlled from the FPGA for closed-loop AGC.
+The MCP6S91 had 18 MHz gain-bandwidth product, at ×8 gain, bandwidth collapsed to 2.25 MHz, making it useless at radar IF frequencies (3 to 67 MHz). The LMH6521 maintains 1400 MHz bandwidth at ALL gain settings (−5.5 to +26 dB, 0.5 dB steps). It's a dual-channel part, naturally handling I and Q. SPI-controlled from the FPGA for closed-loop AGC.
 
 ### 9. LC LPF at 70 MHz (not RC at 4.8 MHz)
 
@@ -481,13 +466,13 @@ The YG802020W delivers +15 dBm, which combined with 24 dBi antennas and coherent
 
 | Issue | Status |
 |-------|--------|
-| **+35 dBm EIRP at 5.5–6 GHz is not ISM** | Requires licensed or experimental authorization in most jurisdictions |
+| **+35 dBm EIRP at 5.5 to 6 GHz is not ISM** | Requires licensed or experimental authorization in most jurisdictions |
 | **LTC5586 performance at 5.8 GHz unverified** | Datasheet specs at 1.9 GHz only. 5.8 GHz is top of its 6 GHz range. Measure gain, NF, I/Q balance on prototype. |
 | **QPL9547 NF at 5.5 GHz** | Datasheet 0.3 dB @ 1.9 GHz; S-params show 11.2 dB gain @ 5.5 GHz. NF at 5.5 GHz estimated ~1 dB. |
 | **System NF = 5.5 dB (expected)** | Dominated by LTC5586 NF / LNA gain. If LTC5586 NF > 20 dB at 5.8 GHz, add THS4509RGTT rescue gain stage. |
 | **PLL loop BW vs chirp rate** | Loop BW must be > 10× chirp rate. Need programmable filter for different modes. |
 | **Fractional-N spurs** | Spurs at PFD/2 offsets. Use dithering mode to reduce. |
-| **FR4 at 5.5–6 GHz** | Higher loss than at lower frequencies. Acceptable for prototype; use Rogers for production. |
+| **FR4 at 5.5 to 6 GHz** | Higher loss than at lower frequencies. Acceptable for prototype; use Rogers for production. |
 | **Micro-Doppler at long range** | 10 kHz PRF limits max unambiguous range to 50 m. Use only for close-range classification. |
 | **LO overdrive to LTC5586** | GP2X+ outputs +11.4 dBm; LTC5586 needs ~0 dBm. 10 dB attenuator pad required. |
 
@@ -495,6 +480,6 @@ The YG802020W delivers +15 dBm, which combined with 24 dBi antennas and coherent
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License, see [LICENSE](LICENSE) for details.
 
 Copyright (c) 2026 Oliver Zoller

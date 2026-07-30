@@ -1,6 +1,6 @@
-# Lyrion Radar — Front-End Specifications
+# Lyrion Radar, Front-End Specifications
 
-> **System**: FMCW radar at 5.5–6 GHz for counter-UAS (drone detection)
+> **System**: FMCW radar at 5.5 to 6 GHz for counter-UAS (drone detection)
 > **Architecture**: ADF41510 PLL chirp → YSGM556006 VCO → TX/RX analog → AD9643 ADC → XC7A100T-2FTG256I FPGA DSP
 
 ---
@@ -9,14 +9,14 @@
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| Frequency band | 5.5 – 6.0 GHz | 500 MHz sweep bandwidth |
+| Frequency band | 5.5 to 6.0 GHz | 500 MHz sweep bandwidth |
 | Range resolution | 30 cm (theoretical) | ΔR = c / (2B); in practice limited by FFT size |
 | Max range (small drone, σ=0.01 m²) | **~1.5 km** | 64-chirp coherent integration, I/Q, NF_sys=5.5 dB |
 | Max range (medium drone, σ=0.1 m²) | **~2.3 km** | 64-chirp coherent integration |
 | Max range (large drone, σ=1 m²) | **~3.5 km** | 64-chirp coherent integration |
 | Path to 3+ km (small drones) | PA upgrade + 27 dBi antennas | +18 dB combined link improvement |
 | Scan rate | 100 Hz to 10 kHz | Configurable per mode |
-| EIRP | +35.4 dBm (3.5 W) | Not ISM — needs experimental license |
+| EIRP | +35.4 dBm (3.5 W) | Not ISM, needs experimental license |
 | Demodulation | **I/Q (complex)** | LTC5586, Doppler direction resolved |
 
 ---
@@ -25,13 +25,13 @@
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| PLL | **ADF41510** | Fractional-N, 1–10 GHz |
-| VCO | **YSGM556006** | 5320–6060 MHz, +6 dBm, 0–5 V tune |
+| PLL | **ADF41510** | Fractional-N, 1 to 10 GHz |
+| VCO | **YSGM556006** | 5320 to 6060 MHz, +6 dBm, 0 to 5 V tune |
 | Reference | **TCXO 100 MHz** | ±1 ppm |
 | PFD frequency | 100 MHz | 1× reference |
 | Phase noise (fractional-N) | −231 dBc/Hz @ 100 kHz | Datasheet spec |
 | Phase noise (integer-N) | −235 dBc/Hz @ 100 kHz | Datasheet spec |
-| Charge pump current | 16 programmable settings | 0.5–7.5 mA |
+| Charge pump current | 16 programmable settings | 0.5 to 7.5 mA |
 | Loop filter BW | 100 kHz (search/track) | Active op-amp, 50° phase margin |
 | Loop filter BW | 500 kHz (micro-Doppler) | Programmable (switched capacitors) |
 | Ramp modes | Sawtooth, triangular | Built-in ramp generator |
@@ -61,7 +61,7 @@ VCO output          +6 dBm    +6 dBm
 6 dB π-pad          −6 dB     0 dBm
 YG802020W PA       +15 dB    +15 dBm
 GP2X+ divider      −3.6 dB   +11.4 dBm
-TX antenna (24 dBi)  —       +35.4 dBm EIRP
+TX antenna (24 dBi)  n/a     +35.4 dBm EIRP
 ```
 
 ---
@@ -74,9 +74,9 @@ TX antenna (24 dBi)  —       +35.4 dBm EIRP
 | LNA (QPL9547) | **+11.2 dB gain** (S21 @ 5.5 GHz) | 0.3 dB NF @ 1.9 GHz, ~1 dB NF @ 5.5 GHz (est.) |
 | LNA OIP3 | +39 dBm @ 1.9 GHz | Datasheet; expect >33 dBm @ 5.5 GHz |
 | LNA P1dB | +22.7 dBm @ 1.9 GHz | Handles TX leakage without compression |
-| I/Q Demodulator (LTC5586) | SE RF in (on-chip transformer), diff I/Q out | 300 MHz–6 GHz, SPI-controlled |
-| LTC5586 conversion gain | +7.7 dB @ 1.9 GHz | **UNVERIFIED @ 5.8 GHz** — expect +3 to +6 dB |
-| LTC5586 RF attenuator | 0–31 dB, 1 dB steps (SPI) | Coarse AGC for close targets |
+| I/Q Demodulator (LTC5586) | SE RF in (on-chip transformer), diff I/Q out | 300 MHz to 6 GHz, SPI-controlled |
+| LTC5586 conversion gain | +7.7 dB @ 1.9 GHz | **UNVERIFIED @ 5.8 GHz**: expect +3 to +6 dB |
+| LTC5586 RF attenuator | 0 to 31 dB, 1 dB steps (SPI) | Coarse AGC for close targets |
 | LTC5586 IF amplifier | 8 gain steps (SPI) | ~0 to +15 dB range |
 | LTC5586 DC offset null | SPI adjustable | Critical for zero-IF FMCW (TX leakage) |
 | LTC5586 image rejection | 37 dB, adjustable to 60 dB (SPI) | |
@@ -107,9 +107,9 @@ RX Antenna (24 dBi, SE)
 
 | Stage | Range | Resolution | Purpose |
 |-------|-------|-----------|---------|
-| LTC5586 RF attenuator | 0–31 dB | 1 dB | Coarse — close targets, jammers, TX leakage |
-| LTC5586 IF amplifier | 0–15 dB (8 steps) | ~2 dB | Medium — coarse gain trim |
-| LMH6521 | −5.5 to +26 dB | **0.5 dB** | Fine — precision AGC loop |
+| LTC5586 RF attenuator | 0 to 31 dB | 1 dB | Coarse, close targets, jammers, TX leakage |
+| LTC5586 IF amplifier | 0 to 15 dB (8 steps) | ~2 dB | Medium, coarse gain trim |
+| LMH6521 | −5.5 to +26 dB | **0.5 dB** | Fine, precision AGC loop |
 | **Total AGC range** | **~72 dB** | | |
 
 ### IF Anti-Alias Filter (LC 3rd-Order Butterworth, 70 MHz)
@@ -131,13 +131,13 @@ Replaces the old 4.8 MHz RC filter which limited range to 1.4 km at 1 kHz chirp 
 
 | Stage | Gain/Loss | Cumulative | Level |
 |-------|-----------|-----------|-------|
-| RX antenna (24 dBi) | — | — | **−139.2 dBm** |
+| RX antenna (24 dBi) | n/a | n/a | **−139.2 dBm** |
 | QPL9547 LNA | +11.2 dB | +11.2 dB | −128.0 dBm |
 | LTC5586 (conv. + IF amp max) | +20 dB (est.) | +31.2 dB | −108.0 dBm |
 | LC LPF (70 MHz) | −0.5 dB | +30.7 dB | −108.5 dBm |
 | LMH6521 (max +26 dB) | +26 dB | **+56.7 dB** | **−82.5 dBm** |
-| AD9643 full scale | — | — | +7 dBm |
-| **Headroom below FS** | — | — | **89.5 dB** |
+| AD9643 full scale | n/a | n/a | +7 dBm |
+| **Headroom below FS** | n/a | n/a | **89.5 dB** |
 
 > **Note**: Signal at ADC is 89.5 dB below full scale. The analog noise floor (amplified thermal noise) at the ADC input is approximately −86 dBm per 1 kHz bin, which is well above the ADC quantization noise (−130 dBm/bin). The ADC is not the noise bottleneck.
 
@@ -147,10 +147,10 @@ Replaces the old 4.8 MHz RC filter which limited range to 1.4 km at 1 kHz chirp 
 F_sys = F_LNA + (F_mixer − 1) / G_LNA
 
 QPL9547 @ 5.5 GHz:  G = 11.2 dB (13.2 linear),  NF ≈ 1.0 dB (F = 1.26)
-LTC5586 @ 5.8 GHz:  NF ≈ 15 dB (F = 31.6) — UNVERIFIED, estimated
+LTC5586 @ 5.8 GHz:  NF ≈ 15 dB (F = 31.6), UNVERIFIED, estimated
 
 F_sys = 1.26 + (31.6 − 1) / 13.2 = 1.26 + 2.32 = 3.58
-NF_sys = 10·log₁₀(3.58) = 5.5 dB
+NF_sys = 10×log₁₀(3.58) = 5.5 dB
 ```
 
 | LTC5586 NF @ 5.8 GHz | System NF | Impact |
@@ -166,7 +166,7 @@ NF_sys = 10·log₁₀(3.58) = 5.5 dB
 | Removed | Reason |
 |---------|--------|
 | YX18 mixer | Replaced by LTC5586 (integrated I/Q) |
-| NCS4-63+ balun (×2) | Eliminated — LTC5586 has on-chip RF transformer |
+| NCS4-63+ balun (×2) | Eliminated, LTC5586 has on-chip RF transformer |
 | OPA838 IF preamp | Replaced by LTC5586 IF amplifier + LMH6521 |
 | MCP6S91 AGC | Replaced by LMH6521 (1400 MHz BW vs 18 MHz GBW) |
 | RC LPF 4.8 MHz | Replaced by LC LPF 70 MHz (was limiting range) |
@@ -228,7 +228,7 @@ Fabric bus:     7 pairs × 8 bits = 56 bits per channel @ 62.5 MHz
 | DDR3 SDRAM | 512 MB (MT41K256M16) | **Required for large FFTs (>8K points)** |
 | **MCU** | **STM32H503CBU6** | Cortex-M33 @ 250 MHz, LQFP-48 |
 | MCU SRAM | 64 KB | (some variants 128 KB) |
-| MCU flash | 128–256 KB | (variant dependent) |
+| MCU flash | 128 to 256 KB | (variant dependent) |
 | MCU peripherals | SPI (3×), I²C (2×), UART, USB | PLL, AGC, temp, debug |
 
 ### FPGA DSP Pipeline (Estimated Resources)
@@ -259,15 +259,13 @@ Fabric bus:     7 pairs × 8 bits = 56 bits per channel @ 62.5 MHz
 | **Fast** | 1 ms | 31.25 MSPS | 31,250 | **8192** | **1.14 m** | 500 m | 1 kHz | 26 m/s |
 | **Micro-Doppler** | 0.1 ms | 250 MSPS | 25,000 | **4096** | **1.83 m** | 50 m | 10 kHz | 261 m/s |
 
-**v_max formula** (for sawtooth with I/Q sampling): `v_max = λ × f_PRF / 2`
-- For real sampling only (prototype 1, single AD9643 channel): halve these values
-- For triangular modulation: halve these values (full period = 2× ramp time)
+**v_max formula** (for sawtooth with I/Q sampling): `v_max = λ × f_PRF / 2`. For real sampling only (prototype 1, single AD9643 channel), halve these values, and for triangular modulation halve them again (full period = 2× ramp time).
 
 **Key relationship**: `N_FFT ≤ N_samples = T_ramp × f_sample`. A smaller FFT gives coarser range resolution. The theoretical 0.3 m resolution is achieved only when N_FFT = N_samples.
 
 ---
 
-## 8. Link Budget (Corrected — I/Q architecture, verified radar equation)
+## 8. Link Budget (Corrected, I/Q architecture, verified radar equation)
 
 ### Radar Equation
 
@@ -275,17 +273,17 @@ Fabric bus:     7 pairs × 8 bits = 56 bits per channel @ 62.5 MHz
 Pr = Pt × Gt × Gr × λ² × σ / ((4π)³ × R⁴)
 
 In dB:
-Pr(dBm) = Pt + Gt + Gr + 20·log₁₀(λ) + 10·log₁₀(σ) − 30·log₁₀(4π) − 40·log₁₀(R)
+Pr(dBm) = Pt + Gt + Gr + 20×log₁₀(λ) + 10×log₁₀(σ) − 30×log₁₀(4π) − 40×log₁₀(R)
 
 Constants:
   Pt = +11.4 dBm (TX antenna port, after GP2X+ divider)
   Gt = Gr = 24 dBi (StarterDish 24 UM)
   λ = c/f = 3×10⁸ / 5.75×10⁹ = 0.0522 m
-  20·log₁₀(λ) = −25.65 dB
-  30·log₁₀(4π) = 32.97 dB
+  20×log₁₀(λ) = −25.65 dB
+  30×log₁₀(4π) = 32.97 dB
 
 Simplified:
-  Pr(dBm) = 0.78 + 10·log₁₀(σ) − 40·log₁₀(R_m)
+  Pr(dBm) = 0.78 + 10×log₁₀(σ) − 40×log₁₀(R_m)
 ```
 
 ### Signal at RX Antenna
@@ -350,7 +348,7 @@ Noise floor per 1 kHz bin = −174 + 30 + 5.5 = **−138.5 dBm**
 | DDR3 VDD | 1.5 V | 500 mA | MT41K256M16 |
 | DDR3 VTT | 0.75 V | 200 mA | DDR termination |
 | PLL | 3.3 V | 100 mA | ADF41510 |
-| **Total** | — | **~4 A** | — |
+| **Total** | n/a | **~4 A** | n/a |
 
 ---
 
@@ -358,7 +356,7 @@ Noise floor per 1 kHz bin = −174 + 30 + 5.5 = **−138.5 dBm**
 
 | Issue | Status | Required action |
 |-------|--------|----------------|
-| +35.4 dBm EIRP at 5.5–6 GHz | **Not ISM** | Experimental or STA license needed |
+| +35.4 dBm EIRP at 5.5 to 6 GHz | **Not ISM** | Experimental or STA license needed |
 | UNII/DFS band incursion | Possible | Check local frequency allocation |
 | RF exposure at 24 dBi | Significant | Safe stand-off distance required |
 
@@ -386,8 +384,8 @@ at R = 1 km, σ = 0.01 m², Pt = +11.4 dBm, Gt = Gr = 24 dBi, f = 5.75 GHz.
 
 **Root cause of the NF error**: Friis formula requires linear values. Using NF(dB) directly (e.g., "1 + (15-1)/10 = 2.4 dB") is wrong. Correct: F = 1.26 + 30.6/13.2 = 3.58 → NF = 5.5 dB.
 
-**Root cause of the RX chain failure**: The MCP6S91 PGA has a gain-bandwidth product of 18 MHz. At ×8 gain (needed for the link budget), bandwidth collapses to 2.25 MHz. The radar IF at 1 km (1 kHz chirp rate) is 3.3 MHz — already outside the MCP6S91's bandwidth. The part was never suitable for this application.
+**Root cause of the RX chain failure**: The MCP6S91 PGA has a gain-bandwidth product of 18 MHz. At ×8 gain (needed for the link budget), bandwidth collapses to 2.25 MHz. The radar IF at 1 km (1 kHz chirp rate) is 3.3 MHz, already outside the MCP6S91's bandwidth. The part was never suitable for this application.
 
 ---
 
-*Specification version 2.0 · Lyrion Radar · MIT License*
+*Specification version 2.0, Lyrion Radar, MIT License*
